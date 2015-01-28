@@ -48,6 +48,9 @@ PUBLISHER_API_DOMAIN = 'prisma-demo.api.mediaocean.com'
 
 VERSION = '0.1'
 
+class PATSException(Exception):
+    pass
+
 class PATSAPIClient(object):
     # controlled values for product catalogue
     possible_media_types = ['PRINT', 'DIGITAL']
@@ -55,7 +58,7 @@ class PATSAPIClient(object):
     possible_media_subtypes_digital = ['DISPLAY_DIGITAL', 'VIDEO', 'MOBILE', 'TABLET', 'APP']
     possible_categories = ['ARTS_AND_ENTERTAINMENT','AUTOMOTIVE','BUSINESS','CAREERS','EDUCATION','FAMILY_AND_PARENTING','HEALTH_AND_FITNESS','FOOD_AND_DRINK','HOBBIES_AND_INTERESTS','HOME_AND_GARDEN','LAW_GOVERNMENT_AND_POLITICS','NEWS','PERSONAL_FINANCE','SOCIETY','SCIENCE','PETS','SPORTS','STYLE_AND_FASHION','TECHNOLOGY_AND_COMPUTING','TRAVEL','REAL_ESTATE','SHOPPING','RELIGION_AND_SPIRITUALITY','SOCIAL_MEDIA']
 
-    def __init__(self, api_key, api_user):
+    def __init__(self, api_key):
         """
         Initialize a PATS instance.
         """
@@ -76,7 +79,7 @@ class PATSAPIClient(object):
         h = HTTPSConnection(domain)
 
         # uncomment this when things just aren't working...
-        h.set_debuglevel(10)
+        # h.set_debuglevel(10)
 
         # Perform the request and get the response headers and content
         headers = self._get_headers(extra_headers)
@@ -121,22 +124,22 @@ class PATSAPIClient(object):
            the PATS/Mediaocean side.
         """
         if error_code == 400:
-            raise Exception(
+            raise PATSException(
                 "Bad Request. The parameters you provided did not validate")
         elif error_code == 401:
-            raise Exception(
+            raise PATSException(
                 "%s Probably invalid API key %s" % (reason, self.api_key))
         elif error_code == 406:
-            raise Exception(
+            raise PATSException(
                 "Not acceptable, your IP address has exceeded the API limit")
         elif error_code == 409:
-            raise Exception(
+            raise PATSException(
                 "Not approved, the user has yet to approve your retrieve request")
         elif error_code == 500:
-            raise Exception(
+            raise PATSException(
                 "Internal server error")
         else:
-            raise Exception(
+            raise PATSException(
                 "Error: %s" % reason)
 
     def save_product_data(self, vendor_id=None, data=None): 
@@ -149,7 +152,7 @@ class PATSAPIClient(object):
         - data (required) : Payload of the product(s) you are updating.
         """
         if vendor_id is None:
-            raise Exception("Vendor ID is required")
+            raise PATSException("Vendor ID is required")
 
         js = self._send_request(
             "POST",
@@ -159,7 +162,7 @@ class PATSAPIClient(object):
             json.dumps(data)
         )
         if js['validationResults']:
-            raise Exception("Product ID "+js['validationResults'][0]['productId']+": error is "+js['validationResults'][0]['message'])
+            raise PATSException("Product ID "+js['validationResults'][0]['productId']+": error is "+js['validationResults'][0]['message'])
         productId = js['products'][0]['productPublicId']
         return js
 
@@ -183,19 +186,19 @@ class PATSAPIClient(object):
         lengths):
 
         if product_id is None:
-            raise Exception("Product ID is required")
+            raise PATSException("Product ID is required")
         
         # validation of lots of parameters for uploading products
         media_type = media_type.upper()
         if media_type not in self.possible_media_types:
-            raise Exception("Product %s: media_type '%s' must be one of '%s'" % (product_id, media_type, ','.join(self.possible_media_types)))
+            raise PATSException("Product %s: media_type '%s' must be one of '%s'" % (product_id, media_type, ','.join(self.possible_media_types)))
         media_subtype = media_subtype.upper()
         if media_type == 'PRINT':
             if media_subtype not in self.possible_media_subtypes_print:
-                raise Exception("media_subtype for PRINT '%s' must be one of '%s'" % (media_subtype, ','.join(self.possible_media_subtypes_print)))
+                raise PATSException("media_subtype for PRINT '%s' must be one of '%s'" % (media_subtype, ','.join(self.possible_media_subtypes_print)))
         if media_type == 'DIGITAL':
             if media_subtype not in self.possible_media_subtypes_digital:
-                raise Exception("media_subtype for DIGITAL '%s' must be one of '%s'" % (media_subtype, ','.join(self.possible_media_subtypes_digital)))
+                raise PATSException("media_subtype for DIGITAL '%s' must be one of '%s'" % (media_subtype, ','.join(self.possible_media_subtypes_digital)))
         placement_type = placement_type.upper()
         category = category.upper().translate(string.maketrans(" ", "_"))
         if publication_days:
@@ -219,7 +222,7 @@ class PATSAPIClient(object):
             positions_available = re.sub(',$', '', positions_available)
             positions_array = re.split(',', positions_available)
         else:
-            raise Exception("Available positions are required")
+            raise PATSException("Available positions are required")
         if sizes_available:
             # get rid of empties and trailing ",0" sequences that News have in their data
             sizes_available = re.sub(',0', '', sizes_available)
@@ -228,7 +231,7 @@ class PATSAPIClient(object):
             # split and de-dupe
             sizes_array = list(OrderedDict.fromkeys(re.split(',', sizes_available)))
         else:
-            raise Exception("Product sizes are required")
+            raise PATSException("Product sizes are required")
         if not circulation:
             print("Warning: circulation not set. Setting to 0")
             circulation = 0
@@ -238,7 +241,7 @@ class PATSAPIClient(object):
         if subsections:
             subsections_array = re.split(',', subsections)
         #else:
-        #    raise Exception("Subsections are required (for now)")
+        #    raise PATSException("Subsections are required (for now)")
         if product_end_date:
             pass
             # convert from excel format d/m/Y to ISO format
@@ -247,11 +250,11 @@ class PATSAPIClient(object):
         else:
             end_date = ''
         if not product_contact_email:
-            raise Exception("Product Contact Email is required")
+            raise PATSException("Product Contact Email is required")
         if not category:
-            raise Exception("Category is required")
+            raise PATSException("Category is required")
         if category not in self.possible_categories:
-            raise Exception("Category '%s' should be one of %s" % (category, ','.join(self.possible_categories)))
+            raise PATSException("Category '%s' should be one of %s" % (category, ','.join(self.possible_categories)))
 
         # now create JSON object to be passed to API
         data = {
@@ -295,9 +298,9 @@ class PATSAPIClient(object):
             })
         if media_type == 'PRINT':
             #if regions is None:
-            #    raise Exception("region is required")
+            #    raise PATSException("region is required")
             if not publishing_cycle:
-                raise Exception("Publishing cycle is required")
+                raise PATSException("Publishing cycle is required")
             data['products'][0]['standardAttributes'].update({
                     "acceptsColor" : False,
                     "circulation": int(circulation),
@@ -374,7 +377,7 @@ class PATSAPIClient(object):
         - max_results (optional): 
         """
         if vendor_id is None:
-            raise Exception("Vendor ID is required")
+            raise PATSException("Vendor ID is required")
 
         params = {}
         if start_index:
@@ -392,7 +395,7 @@ class PATSAPIClient(object):
             { 'Accept': 'application/vnd.mediaocean.catalog-v1+json' }
         )
         if js['validationResults']:
-            raise Exception("Product ID "+js['validationResults'][0]['productId']+": error is "+js['validationResults'][0]['message'])
+            raise PATSException("Product ID "+js['validationResults'][0]['productId']+": error is "+js['validationResults'][0]['message'])
         productId = js['products'][0]['productPublicId']
         return js
 
@@ -405,11 +408,11 @@ class PATSAPIClient(object):
             from the person named as the buyer contact in the order)
         """
         if kwargs.get('agency_id') == None:
-            raise Exception("Agency ID is required")
+            raise PATSException("Agency ID is required")
         if kwargs.get('company_id') == None:
-            raise Exception("Company ID is required")
+            raise PATSException("Company ID is required")
         if kwargs.get('insertion_order_details') == None:
-            raise Exception("Insertion Order object is required")
+            raise PATSException("Insertion Order object is required")
         insertion_order = kwargs.get('insertion_order_details', None)
 
         extra_headers = {}
@@ -454,7 +457,7 @@ class PATSAPIClient(object):
         "campaign_details" must be a CampaignDetails instance.
         """
         if not isinstance(campaign_details, CampaignDetails):
-            raise Exception(
+            raise PATSException(
                 "The campaign_details parameter should be a CampaignDetails instance")
 
         # Create the http object
@@ -481,7 +484,7 @@ class JSONSerializable(object):
         return json.dumps(self.dict_repr())
 
     def dict_repr(self):
-        raise Exception("We shouldn't get here, stuff should happen in subclass")
+        raise PATSException("We shouldn't get here, stuff should happen in subclass")
 
 class CampaignDetails(JSONSerializable):
     """
