@@ -1,8 +1,10 @@
 #!/usr/bin/env python                                         
 
-from pats import *
+from .core import *
+from .buyer import *
+from .seller import *
 
 __version__ = VERSION
-__all__ = ('PatsAPIClient', 'PATSException', '__version__')
+__all__ = ('PATSBuyer', 'PATSSeller', 'PATSException', '__version__')
 __author__ = 'Brendan Quinn' 
 
