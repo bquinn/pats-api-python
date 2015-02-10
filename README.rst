@@ -117,7 +117,7 @@ Buyer side:
 
 * Entity classes:
 
-  * Constructors for ``CampaignDetails()``, ``InsertionOrderDetails()``, ``InsertionOrderLineItemPrint()``, ``InsertionOrderLineItemDigital``
+  * Constructors for ``CampaignDetails()``, ``InsertionOrderDetails()``, ``InsertionOrderLineItemPrint()``, ``InsertionOrderLineItemDigital()``
 
 Seller side:
 
