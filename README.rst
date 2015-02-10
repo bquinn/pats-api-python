@@ -15,13 +15,10 @@ Installing from github::
 
     pip install -e git://github.com/bquinn/.git#egg=pats-api-python
 
-Documentation
--------------
-
-See https://pats.readthedocs.org/en/latest/
+Usage
+-----
 
 Example::
--------
 
     import pats
 
