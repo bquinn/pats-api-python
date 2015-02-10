@@ -97,7 +97,7 @@ Buyer side:
 * RFPs:
 
   * Submit RFP ``submit_rfp()`` (coming soon)
-  * Submit product-based RFP: ``submit_product_rfp() ``(coming soon)
+  * Submit product-based RFP: ``submit_product_rfp()`` (coming soon)
   * View RFP including proposals: ``view_rfp_detail(user_email, rfp_id)``
   * Get RFP attachment: ``get_rfp_attachment(user_email, rfp_id, attachment_id)``
   * Search RFPs: ``search_rfps()``
@@ -117,7 +117,7 @@ Buyer side:
 
 * Entity classes:
 
-  * Constructors for campaign details, order details, print line item, digital line item
+  * Constructors for ``CampaignDetails()``, ``InsertionOrderDetails()``, ``InsertionOrderLineItemPrint()``, ``InsertionOrderLineItemDigital``
 
 Seller side:
 
