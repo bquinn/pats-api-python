@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2009, Jaccob Burch
@@ -7,7 +6,7 @@
 #
 # All rights reserved.
 
-# Copyright (c) 2014, Brendan Quinn, Clueful Media Ltd / JT-PATS Ltd
+# Copyright (c) 2015, Brendan Quinn, Clueful Media Ltd / JT-PATS Ltd
 #
 # The MIT License
 #
@@ -65,6 +64,147 @@ class PATSBuyer(PATSAPIClient):
             raise PATSException("Agency (aka buyer) ID is required")
         self.agency_id = agency_id
 
+    def create_campaign(self, campaign_details=None, **kwargs):
+        """
+        Create an agency-side campaign, which is then used to send RFPs and orders.
+        "campaign_details" must be a CampaignDetails instance.
+        """
+        if not isinstance(campaign_details, CampaignDetails):
+            raise PATSException(
+                "The campaign_details parameter should be a CampaignDetails instance")
+
+        # Create the http object
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
+            'X-MO-Person-ID': campaign_details.person_id,
+            'X-MO-Company-ID': campaign_details.company_id,
+            'X-MO-Organization-ID': campaign_details.organisation_id
+        }
+        js = self._send_request(
+            "POST",
+            AGENCY_API_DOMAIN,
+            "/campaigns",
+            extra_headers,
+            campaign_details.json_repr()
+        )
+        campaignId = js['campaignId']
+        return campaignId
+
+    def view_campaign_detail(self, user_email, campaign_public_id):
+        # aka "view RFPs for campaign"
+        pass
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'X-MO-User-Id': user_email
+        }
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            "/agencies/%s/campaign/%s/rfps" % (self.vendor_id, campaign_public_id),
+            extra_headers
+        )
+        return js
+
+    def submit_rfp(self):
+        # TODO
+        # /agencies/{agencyPublicId}/campaigns/{campaignPublicId}/rfps
+        pass
+
+    def submit_product_rfp(self):
+        # TODO
+        # /agencies/{agencyPublicId}/campaigns/{campaignPublicId}/rfps
+        pass
+
+    def view_rfp_detail(self, user_email=None, rfp_id=None):
+        if rfp_id is None:
+            raise PATSException("RFP ID is required")
+        if user_email is None:
+            raise PATSException("User Email is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'X-MO-User-Id': user_email
+        }
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            "/agencies/%s/rfps/%s" % (self.vendor_id, rfp_id),
+            extra_headers
+        )
+        return js
+
+   def get_rfp_attachment(self, user_email=None, rfp_id=None, attachment_id=None):
+        # is this for both buyer and seller side?
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'X-MO-User-Id': user_email
+        }
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            "/agencies/%s/rfps/%s/attachments/%s" % (self.vendor_id, rfp_id, attachment_id),
+            extra_headers
+        )
+        return js
+
+    def search_rfps(self):
+        # /agencies/35-1-1W-1/rfps?advertiserName=Jaguar Land Rover&campaignUrn=someUrn&rfpStartDate=2014-08-10&rfpEndDate=2015-01-10&responseDueDate=2015-08-25&status=SENT
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'X-MO-User-Id': user_email
+        }
+        # TODO
+        pass
+
+    def get_proposal_attachment(self, user_email=None, proposal_public_id=None, attachment_id=None):
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'X-MO-User-Id': user_email
+        }
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            "/agencies/%s/proposals/%s/attachments/%s" % (self.vendor_id, proposal_public_id, attachment_id),
+            extra_headers
+        )
+        return js
+
+    def return_proposal(self):
+        # TODO
+        pass
+
+    def list_products(self, vendor_id=None, start_index=None, max_results=None, include_logo=False):
+        """
+        List products in a vendor's product catalogue.
+
+        The parameters are :
+        - vendor_id (required): ID of the vendor (publisher) whose catalogue
+          you are requesting.
+        - start_index (optional): First product to load (if doing paging)
+        - max_results (optional):
+        """
+        if vendor_id is None:
+            raise PATSException("Vendor ID is required")
+
+        params = {}
+        if start_index:
+            params.update({'start_index' : start_index})
+        if max_results:
+            params.update({'max_results' : max_results})
+        if include_logo:
+            params.update({'include_logo' : include_logo})
+        params = urlencode(params)
+
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            "/agencies/%s/vendors/%s/products/?%s" % (self.agency_id, vendor_id, params),
+            { 'Accept': 'application/vnd.mediaocean.catalog-v1+json' }
+        )
+        if js['validationResults']:
+            raise PATSException("Product ID "+js['validationResults'][0]['productId']+": error is "+js['validationResults'][0]['message'])
+        productId = js['products'][0]['productPublicId']
+        return js
+
     def create_order(self, **kwargs):
         """
         create a print or digital order in PATS.
@@ -72,12 +212,15 @@ class PATSBuyer(PATSAPIClient):
         company_id: PATS ID of the buying company (eg PATS3)
         person_id: (optional?) PATS ID of the person sending the order (different
             from the person named as the buyer contact in the order)
+        insertion_order_details: info about the insertion order (must be an InsertionOrderDetails object)
         """
         if kwargs.get('company_id') == None:
             raise PATSException("Company ID is required")
         if kwargs.get('insertion_order_details') == None:
             raise PATSException("Insertion Order object is required")
         insertion_order = kwargs.get('insertion_order_details', None)
+        if not instanceof(insertion_order, InsertionOrderDetails):
+            raise PATSException("insertion_order_details must be an instance of InsertionOrderDetails")
 
         extra_headers = {}
         extra_headers.update({
@@ -115,63 +258,73 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def create_campaign(self, campaign_details=None, **kwargs):
+    def view_orders(self, buyer_email=None, start_date=None, end_date=None):
         """
-        Create an agency-side campaign, which is then used to send RFPs and orders.
-        "campaign_details" must be a CampaignDetails instance.
+        As a buyer, view all orders I have sent.
         """
-        if not isinstance(campaign_details, CampaignDetails):
-            raise PATSException(
-                "The campaign_details parameter should be a CampaignDetails instance")
+        if start_date == None:
+            raise PATSException("Start date is required")
+        if buyer_email == None:
+            raise PATSException("Buyer email is required")
 
-        # Create the http object
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
-            'X-MO-Person-ID': campaign_details.person_id,
-            'X-MO-Company-ID': campaign_details.company_id,
-            'X-MO-Organization-ID': campaign_details.organisation_id
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-User-Id': buyer_email
+        }
+
+        path = '/agencies/%s/orders/revisions' % self.agency_id
+        if start_date and end_date:
+            # not sure if you can have one or the other on its own?
+            path += "?startDate=%s&endDate=%s" % (
+                start_date.strftime("%Y-%m-%d"),
+                end_date.strftime("%Y-%m-%d")
+            )
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        # TODO: Parse the response and return something more intelligible
+        return js
+
+        
+    def view_order_detail(self, buyer_email=None, order_public_id=None):
+        # /agencies/{agency public id}/orders/{External Order Id}/revisions
+        if buyer_email == None:
+            raise PATSException("Buyer email is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-User-Id': buyer_email
+        }
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            "/agencies/%s/orders/%s/revisions" % (self.agency_id, order_public_id),
+            extra_headers,
+        )
+        return js
+
+    def return_order_revision(self, order_public_id, order_major_version, order_minor_version, buyer_email, seller_email, revision_due_date, comment):
+        # TODO: allow attachments
+        # /agencies/{agency public id}/orders/{external public id}/revisions/return 
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1.0+json',
+            'X-MO-User-ID': buyer_email
+        }
+        data = {
+            'majorVersion': order_major_version,
+            'minorVersion': order_minor_version,
+            'revisionDueBy': revision_due_date.strftime("%Y-%m-%d"),
+            'comment': comment,
+            'email': seller_email,
+            'orderAttachments': [], # leave it blank for now
         }
         js = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,
-            "/campaigns",
+            "/agencies/%s/orders/%s/revisions/return" % (self.agency_id, order_public_id),
             extra_headers,
-            campaign_details.json_repr()
+            json.dumps(data)
         )
-
-        campaignId = js['campaignId']
-        return campaignId
-
-    def list_products(self, vendor_id=None, start_index=None, max_results=None, include_logo=False):
-        """
-        List products in a vendor's product catalogue.
-
-        The parameters are :
-        - vendor_id (required): ID of the vendor (publisher) whose catalogue
-          you are requesting.
-        - start_index (optional): First product to load (if doing paging)
-        - max_results (optional):
-        """
-        if vendor_id is None:
-            raise PATSException("Vendor ID is required")
-
-        params = {}
-        if start_index:
-            params.update({'start_index' : start_index})
-        if max_results:
-            params.update({'max_results' : max_results})
-        if include_logo:
-            params.update({'include_logo' : include_logo})
-        params = urlencode(params)
-
-        js = self._send_request(
-            "GET",
-            AGENCY_API_DOMAIN,
-            "/agencies/%s/vendors/%s/products/?%s" % (self.agency_id, vendor_id, params),
-            { 'Accept': 'application/vnd.mediaocean.catalog-v1+json' }
-        )
-        if js['validationResults']:
-            raise PATSException("Product ID "+js['validationResults'][0]['productId']+": error is "+js['validationResults'][0]['message'])
-        productId = js['products'][0]['productPublicId']
         return js
-

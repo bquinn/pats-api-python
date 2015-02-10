@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2009, Jaccob Burch
@@ -7,7 +6,7 @@
 #
 # All rights reserved.
 
-# Copyright (c) 2014, Brendan Quinn, Clueful Media Ltd / JT-PATS Ltd
+# Copyright (c) 2015, Brendan Quinn, Clueful Media Ltd / JT-PATS Ltd
 #
 # The MIT License
 #
