@@ -91,9 +91,11 @@ Features so far
 ---------------
 
 Buyer side:
+
 * Create campaign: create_campaign()
 * View campaign including RFPs: view_campaign_detail()
 * RFPs:
+
   * Submit RFP submit_rfp() (coming soon)
   * Submit product-based RFP: submit_product_rfp() (coming soon)
   * View RFP including proposals: view_rfp_detail(user_email, rfp_id)
@@ -101,25 +103,36 @@ Buyer side:
   * Search RFPs: search_rfps()
   * Get proposal attachment: get_proposal_attachment(user_email, proposal_id, attachment_id)
   * Return proposal: return_proposal() (coming soon)
+
 * Orders:
+
   * Create print or digital order against a campaign: create_order()
   * View orders between dates: view_orders(start_date, end_date)
   * (NB: "Get order status" is changing for next version)
   * Return order revision: return_order_revision(order_public_id, order_major_version, order_minor_version, buyer_email, seller_email, revision_due_date, comment)
+
 * Product Catalogue:
+
   * list products: list_products()
+
 * Entity classes:
+
   * Constructors for campaign details, order details, print line item, digital line item
 
 Seller side:
+
 * Product Catalogue:
+
   * add or edit print or digital product: save_product()
   * list products: list_products()
+
 * Orders:
+
   * View orders between dates: view_orders(start_date, end_date)
   * View detail of an order: view_order_detail(order_id)
+
 * RFPs:
+
   * View RFPs between dates: view_rfps(start_date, end_date)
   * View proposals for an RFP: view_proposals(rfp_id)
   * Send proposal against an RFP: send_proposal(rfp_id, proposal_external_id, comments, digital_line_items, print_line_items)
-  * 
