@@ -80,12 +80,31 @@ Example::
         servedBy="3rd party",
         bookingCategoryName="Standalone",
         flighting=[
-            { "startDate": "2015-02-01", "endDate": "2015-02-28", "unitAmount": 2000000, "plannedCost": "30000.00" }
+            {
+                "startDate": "2015-02-01",
+                "endDate": "2015-02-28",
+                "unitAmount": 2000000,
+                "plannedCost": "30000.00"
+            }
         ]
     )
     line_items = [ line_item_1 ]
-    response = pats_buyer.create_order(agency_id=agency_id, company_id=company_id, person_id=person_id, external_campaign_id=external_campaign_id, media_type=media_type, insertion_order_details=insertion_order_details, line_items=line_items)
-    # returns {"status":"SUCCESSFUL","fieldValidations":[],"publicId":"MyTestOrder-0001","version":1}
+    response = pats_buyer.create_order(
+        agency_id=agency_id,
+        company_id=company_id,
+        person_id=person_id,
+        external_campaign_id=external_campaign_id,
+        media_type=media_type,
+        insertion_order_details=insertion_order_details,
+        line_items=line_items
+    )
+    # returns
+    # {
+    #   "status":"SUCCESSFUL",
+    #   "fieldValidations":[],
+    #   "publicId":"MyTestOrder-0001",
+    #   "version":1
+    # }
     
 Features so far
 ---------------
