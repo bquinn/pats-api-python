@@ -42,7 +42,7 @@ import os
 import re
 import string
 from urllib import urlencode
-from .core import PATSAPIClient
+from .core import PATSAPIClient, PATSException
 
 PUBLISHER_API_DOMAIN = 'demo-publishers.api.mediaocean.com'
 
@@ -325,14 +325,40 @@ class PATSSeller(PATSAPIClient):
         # TODO: Parse the response and return something more intelligible
         return js
 
+    def view_order_history(self, order_id=None):
+        # TODO - docs being released on 9 March apparently...
+        if order_id == None:
+            raise PATSException("order ID is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json'
+        }
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            '/vendors/%s/orders/%s/history' % (self.vendor_id, order_id),
+            extra_headers
+        )
+        # Should parse the response and return something more intelligible
+        return js
+        
+    def send_order_revision(self, order_id=None):
+        # TODO - docs being released on 9 March apparently...
+        if order_id == None:
+            raise PATSException("order ID is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json'
+        }
+        pass
+
     def view_rfps(self, start_date=None, end_date=None):
         """
         As a seller, view all RFPs from buyers.
         """
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfps-v1+json'
+            # this will probably change to "rfps" soon to be consistent with other headers
+            'Accept': 'application/vnd.mediaocean.rfp-v1+json'
         }
-        path = '/vendors/%s/rfps' % self_vendor_id
+        path = '/vendors/%s/rfps' % self.vendor_id
         if start_date and end_date:
             # not sure if you can have one or the other on its own?
             path += "?startDate=%s&endDate=%s" % (
@@ -356,7 +382,7 @@ class PATSSeller(PATSAPIClient):
             raise PATSException("RFP ID is required")
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.proposals-v1+json'
+            'Accept': 'application/vnd.mediaocean.proposal-v1+json'
         }
 
         js = self._send_request(
@@ -373,14 +399,14 @@ class PATSSeller(PATSAPIClient):
         As a seller, send a proposal in response to a buyer's RFP.
         """
 
-        if kwargs.get('digital_line_items'):
-            digital_line_items = []
-            for line_item in kwargs['digital_line_items']:
-                digital_line_items.append(line_item.dict_repr())
-        if kwargs.get('print_line_items'):
-            print_line_items = []
-            for line_item in kwargs['print_line_items']:
-                print_line_items.append(line_item.dict_repr())
+        digital_line_items_obj = []
+        if digital_line_items:
+            for line_item in digital_line_items:
+                digital_line_items_obj.append(line_item.dict_repr())
+        print_line_items_obj = []
+        if print_line_items:
+            for line_item in print_line_items:
+                print_line_items_obj.append(line_item.dict_repr())
 
         data = {
             "rfpPublicId": rfp_id,
@@ -389,23 +415,33 @@ class PATSSeller(PATSAPIClient):
             "proposal": {
                 "proposalExternalId": proposal_external_id, # why is this included twice??
                 "comments" : comments,
-                "digitalLineItems": digital_line_items,
-                "printLineItems": print_line_items,
+                "digitalLineItems": digital_line_items_obj,
+                "printLineItems": print_line_items_obj,
                 "attachments" : attachments
             }
         }
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.proposals-v1+json'
+            'Accept': 'application/vnd.mediaocean.proposal-v1+json'
         }
 
         js = self._send_request(
             "POST",
             PUBLISHER_API_DOMAIN,
-            "/vendors/%s/rfps/%s/proposals" % (self.vendor_id, rfp_id),
+            "/vendors/%s/proposals" % self.vendor_id,
             extra_headers,
-            data
+            json.dumps(data)
         )
-        # TODO: Parse the response and return something more intelligible
+        if 'validationResult' in js:
+            errorStr = "Create proposal failed:\n"
+            for type in js['validationResult']:
+                errors = js['validationResult'][type]
+                if errors:
+                    errorStr += type + ":\n"
+                    for lineno in errors:
+                        errorStr += "  line "+lineno+":\n"
+                        for fielderror in errors[lineno]:
+                            errorStr += "    " + fielderror['fieldName'] + ": " + fielderror['message'] + "\n"
+            raise PATSException(errorStr)
         return js
 
