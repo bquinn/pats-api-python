@@ -1,11 +1,4 @@
-
 # -*- coding: utf-8 -*-
-
-# Copyright (c) 2009, Jaccob Burch
-# Copyright (c) 2010, Olivier Hervieu
-# Copyright (c) 2011, Ken Pepple
-#
-# All rights reserved.
 
 # Copyright (c) 2015, Brendan Quinn, Clueful Media Ltd / JT-PATS Ltd
 #
@@ -49,7 +42,7 @@ PUBLISHER_API_DOMAIN = 'demo-publishers.api.mediaocean.com'
 class PATSSeller(PATSAPIClient):
     vendor_id = None
 
-    def __init__(self, vendor_id=None, api_key=None):
+    def __init__(self, vendor_id=None, api_key=None, debug_mode=False):
         """
         Create a new seller-side PATS API object.
 
@@ -58,7 +51,7 @@ class PATSSeller(PATSAPIClient):
           you are updating.
         - api_key (required) : API Key with seller access
         """
-        super(PATSSeller, self).__init__(api_key)
+        super(PATSSeller, self).__init__(api_key, debug_mode)
         if vendor_id == None:
             raise PATSException("Vendor (aka publisher) ID is required")
         self.vendor_id = vendor_id
@@ -280,6 +273,56 @@ class PATSSeller(PATSAPIClient):
 
         return self.save_product_data(data)
 
+    def get_agency_by_id(self, agency_id=None, user_id=None, last_updated_date=None):
+        """
+        As a seller, view detail about the specified agency.
+        BROKEN - bug no PATS-880
+        """
+        if agency_id == None:
+            raise PATSException("Agency ID is required")
+        if user_id == None:
+            raise PATSException("User ID is required")
+
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.security-v1+json',
+            'X-MO-User-ID': user_id
+        }
+        path = '/agencies?agencyId=%s' % agency_id
+        if last_updated_date:
+            path += "&lastUpdatedDate="+last_updated_date.strftime("%Y-%m-%d")
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        # TODO: Parse the response and return something more intelligible
+        return js
+
+    def get_agency_by_name(self, agency_name=None, user_id=None, last_updated_date=None):
+        """
+        As a seller, view detail about the specified agency.
+        BROKEN - bug no PATS-880
+        """
+        if agency_name == None:
+            raise PATSException("Agency name string is required")
+        if user_id == None:
+            raise PATSException("User ID is required")
+
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.security-v1+json',
+            'X-MO-User-ID': user_id
+        }
+        path = '/agencies?name=%s' % agency_name
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        # TODO: Parse the response and return something more intelligible
+        return js
+
     def view_orders(self, start_date=None, end_date=None):
         """
         As a seller, view all orders received from buyers.
@@ -358,13 +401,11 @@ class PATSSeller(PATSAPIClient):
             # this will probably change to "rfps" soon to be consistent with other headers
             'Accept': 'application/vnd.mediaocean.rfp-v1+json'
         }
-        path = '/vendors/%s/rfps' % self.vendor_id
-        if start_date and end_date:
-            # not sure if you can have one or the other on its own?
-            path += "?startDate=%s&endDate=%s" % (
-                start_date.strftime("%Y-%m-%d"),
-                end_date.strftime("%Y-%m-%d")
-            )
+        path = '/vendors/%s/rfps?' % self.vendor_id
+        if start_date:
+            path += "startDate=%s" % start_date.strftime("%Y-%m-%d")
+        if end_date:
+            path += "&endDate=%s" % end_date.strftime("%Y-%m-%d")
         js = self._send_request(
             "GET",
             PUBLISHER_API_DOMAIN,
@@ -410,10 +451,8 @@ class PATSSeller(PATSAPIClient):
 
         data = {
             "rfpPublicId": rfp_id,
-            "vendorPublicId" : self.vendor_id,
-            "proposalExternalId":proposal_external_id,
             "proposal": {
-                "proposalExternalId": proposal_external_id, # why is this included twice??
+                "proposalExternalId": proposal_external_id,
                 "comments" : comments,
                 "digitalLineItems": digital_line_items_obj,
                 "printLineItems": print_line_items_obj,

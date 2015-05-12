@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2009, Jaccob Burch
-# Copyright (c) 2010, Olivier Hervieu
-# Copyright (c) 2011, Ken Pepple
-#
-# All rights reserved.
-
 # Copyright (c) 2015, Brendan Quinn, Clueful Media Ltd / JT-PATS Ltd
 #
 # The MIT License
@@ -53,12 +47,20 @@ class PATSAPIClient(object):
     possible_media_types = ['PRINT', 'DIGITAL']
     possible_media_subtypes_print = ['DISPLAY_PRINT', 'CLASSIFIED', 'INSERTS', 'PRINT_CUSTOM']
     possible_media_subtypes_digital = ['DISPLAY_DIGITAL', 'VIDEO', 'MOBILE', 'TABLET', 'APP']
+    # "old" values pre April 2015
     possible_categories = ['ARTS_AND_ENTERTAINMENT','AUTOMOTIVE','BUSINESS','CAREERS','EDUCATION','FAMILY_AND_PARENTING','HEALTH_AND_FITNESS','FOOD_AND_DRINK','HOBBIES_AND_INTERESTS','HOME_AND_GARDEN','LAW_GOVERNMENT_AND_POLITICS','NEWS','PERSONAL_FINANCE','SOCIETY','SCIENCE','PETS','SPORTS','STYLE_AND_FASHION','TECHNOLOGY_AND_COMPUTING','TRAVEL','REAL_ESTATE','SHOPPING','RELIGION_AND_SPIRITUALITY','SOCIAL_MEDIA']
-    def __init__(self, api_key):
+    # "new" values sent by Jon on 8 April 2015
+    possible_categories = ['ARTS_AND_ENTERTAINMENT','BEAUTY_AND_FITNESS','BOOKS_AND_LITERATURE','BUSINESS_AND_INDUSTRIAL','COMPUTERS_AND_ELECTRONICS','FINANCE','FOOD_AND_DRINK','GAMES','HEALTH','HOBBIES_AND_LEISURE','HOME_AND_GARDEN','INTERNET_AND_TELECOM','JOBS_AND_EDUCATION','LAW_GOVT_AND_POLITICS_NEWS','ONLINE_COMMUNITIES','PEOPLE_AND_SOCIETY','PETS_AND_ANIMALS','REAL_ESTATE','REFERENCE','SCIENCE','SHOPPING','SPORTS','TRAVEL']
+    # debugging mode flag
+    debug_mode = False
+
+    def __init__(self, api_key, debug_mode=False):
         """
         Initialize a PATS instance.
         """
         self.api_key = api_key
+        if debug_mode:
+            self.debug_mode = True
 
     def _get_headers(self, extra_headers):
         # Set User-Agent
@@ -75,7 +77,8 @@ class PATSAPIClient(object):
         h = HTTPSConnection(domain)
 
         # uncomment this when things just aren't working...
-        h.set_debuglevel(10)
+        if self.debug_mode:
+            h.set_debuglevel(10)
 
         # Perform the request and get the response headers and content
         headers = self._get_headers(extra_headers)
@@ -84,19 +87,25 @@ class PATSAPIClient(object):
                   body,
                   headers)
         response = h.getresponse()
+        response_status = response.status
+        response_text = response.read()
+
+        if self.debug_mode:
+            print "DEBUG: response status is %d, full response is" % response_status
+            print response_text
 
         # Bad Request gives an error in text, not JSON
-        if response.status == 400:
-            self._relay_error(response.status, response.read())
+        if response_status == 400:
+            self._relay_error(response_status, response_text)
 
         # 422 is "unprocessable entity" but more details are given in the JS response
         # so we should use that instead
-        if response.status != 200 and response.status != 422:
-            self._relay_error(response.status, response.reason)
+        if response_status != 200 and response_status != 422:
+            self._relay_error(response_status, response.reason)
 
-        js = json.JSONDecoder().decode(response.read())
+        js = json.JSONDecoder().decode(response_text)
 
-        if response.status == 422 and 'message' in js:
+        if response_status == 422 and 'message' in js:
             self._relay_error(js['code'], js['message'])
         # sometimes the call returns 200 but then have a "FAILED" message in the response
         if 'status' in js and js['status'] == 'FAILED':
@@ -104,7 +113,10 @@ class PATSAPIClient(object):
             for errorjs in js['fieldValidations']:
                 if errorString:
                     errorString += ", "
-                errorString += errorjs['dataName'] + ": " + errorjs['message']
+                if 'dataName' in errorjs and errorjs['dataName'] != None:
+                    errorString += errorjs['dataName'] + ": "
+                if 'message' in errorjs:
+                    errorString += errorjs['message']
             self._relay_error(422, errorString)
 
         return js
@@ -227,6 +239,7 @@ class InsertionOrderDetails(JSONSerializable):
     """
     campaign_id = None
     external_order_id = None
+    external_publisher_order_id = None
     media_type = None
     publisher_id = None
     agency_buyer_first_name = None
@@ -245,6 +258,11 @@ class InsertionOrderDetails(JSONSerializable):
         self.campaign_id = kwargs.get('campaign_id', '')
         self.media_type = kwargs.get('media_type', '')
         self.external_order_id = kwargs.get('external_order_id', '')
+        if len(self.external_order_id) > 32:
+            raise PATSException("Order fails if length of external_order_id is more than 32 characters")
+        self.external_publisher_order_id = kwargs.get('external_order_id', '')
+        if len(self.external_publisher_order_id) > 32:
+            raise PATSException("Order fails if length of external_publisher_order_id is more than 32 characters")
         self.publisher_id = kwargs.get('publisher_id', '')
         self.agency_buyer_first_name = kwargs.get('agency_buyer_first_name', '')
         self.agency_buyer_last_name = kwargs.get('agency_buyer_last_name', '')
@@ -261,6 +279,7 @@ class InsertionOrderDetails(JSONSerializable):
     def dict_repr(self):
         dict = {
             "externalOrderId":self.external_order_id,
+            "externalPublisherOrderId":self.external_publisher_order_id,
             "publisherId": self.publisher_id,
             "agencyBuyerFirstName": self.agency_buyer_first_name,
             "agencyBuyerLastName": self.agency_buyer_last_name,
@@ -371,6 +390,8 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
     publication = None # "Time",
     # "printInsertion":{
     size = None # ":"25x4",
+    rate = None # "15.00",
+    units = 0
     color = None # ":"4CLR",
     colorName = None # ":"4 colour",
     printPosition = None # ":"Front Half",
@@ -384,33 +405,60 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
 
     def __init__(self, *args, **kwargs):
         super(InsertionOrderLineItemPrint, self).__init__(*args, **kwargs)
+        self.publication = kwargs.get('publication', '')
         self.size = kwargs.get('size', '')
         self.color = kwargs.get('color', '')
+        self.units = kwargs.get('units', '')
+        self.rate = kwargs.get('rate', '')
         self.printPosition = kwargs.get('printPosition', '')
         self.positionName = kwargs.get('positionName', '')
         self.isPositionGuaranteed = kwargs.get('isPositionGuaranteed', '')
         self.includeInDigitalEdition = kwargs.get('includeInDigitalEdition', '')
-        self.coverDate = kwargs.get('coverDate', '')
-        self.saleDate = kwargs.get('saleDate', '')
-        self.copyDeadline = kwargs.get('copyDeadline', '')
+        self.coverDate = kwargs.get('coverDate', None)
+        self.saleDate = kwargs.get('saleDate', None)
+        self.copyDeadline = kwargs.get('copyDeadline', None)
+        self.sizeNumCols = kwargs.get('sizeNumCols', None)
+        self.sizeNumUnits = kwargs.get('sizeNumUnits', None)
         if self.buyCategory not in self.possible_buy_categories_print:
             raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
-    def dict_repr(self, line_number):
+    def dict_repr(self):
         dict = super(InsertionOrderLineItemPrint, self).dict_repr()
-        dict.update({
-            "publication": self.publication,
-            "printInsertion": {
+        printInsertion = {
                 "size": self.size,
                 "color": self.color,
                 "printPosition": self.printPosition,
                 "positionName": self.positionName,
                 "isPositionGuaranteed":self.isPositionGuaranteed,
-                "includeInDigitalEdition": self.includeInDigitalEdition,
-                "coverDate": self.coverDate.strftime("%Y-%m-%d"),
-                "saleDate": self.saleDate.strftime("%Y-%m-%d"),
+                "includeInDigitalEdition": self.includeInDigitalEdition
+        }
+        if self.coverDate:
+            printInsertion.update({
+                "coverDate": self.coverDate.strftime("%Y-%m-%d")
+            })
+        if self.saleDate:
+            printInsertion.update({
+                "saleDate": self.saleDate.strftime("%Y-%m-%d")
+            })
+        if self.copyDeadline:
+            printInsertion.update({
                 "copyDeadline": self.copyDeadline.strftime("%Y-%m-%d")
-            }
+            })
+        if self.sizeNumCols:
+            printInsertion.update({
+                "sizeNumCols": self.sizeNumCols
+            })
+        if self.sizeNumUnits:
+            printInsertion.update({
+                "sizeNumUnits": self.sizeNumUnits
+            })
+        dict.update({
+            "operation": self.operation,
+            "publication": self.publication,
+            # the parent class handles "unitAmount" but print has "units" differently
+            "rate": self.rate,
+            "units": self.units,
+            "printInsertion": printInsertion
         })
         return dict
 
@@ -453,12 +501,25 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
         dict.update({
             "site": self.site,
             "rate": self.rate,
-            "flightStart": self.flightStart,
-            "flightEnd": self.flightEnd,
+            "flightStart": self.flightStart.strftime("%Y-%m-%d"),
+            "flightEnd": self.flightEnd.strftime("%Y-%m-%d"),
             "dimensions": self.dimensions,
             "dimensionsPosition": self.dimensionsPosition,
             "servedBy": self.servedBy,
             "bookingCategoryName": self.bookingCategoryName,
-            "flighting": self.flighting
         })
+        if self.flighting:
+            flightingArray = []
+            for flight in self.flighting:
+                flightingArray.append(
+                      {
+                        "startDate":flight['startDate'].strftime("%Y-%m-%d"),
+                        "endDate":flight['endDate'].strftime("%Y-%m-%d"),
+                        "unitAmount":flight['unitAmount'],
+                        "plannedCost":flight['plannedCost']
+                      }
+                )
+            dict.update({
+                "flighting": flightingArray
+            })
         return dict

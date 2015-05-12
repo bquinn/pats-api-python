@@ -44,7 +44,7 @@ VERSION = '0.1'
 class PATSBuyer(PATSAPIClient):
     agency_id = None
 
-    def __init__(self, agency_id=None, api_key=None):
+    def __init__(self, agency_id=None, api_key=None, debug_mode=False):
         """
         Create a new buyer-side PATS API object.
 
@@ -53,10 +53,54 @@ class PATSBuyer(PATSAPIClient):
           you are updating.
         - api_key (required) : API Key with buyer access
         """
-        super(PATSBuyer, self).__init__(api_key)
+        super(PATSBuyer, self).__init__(api_key, debug_mode)
         if agency_id == None:
             raise PATSException("Agency (aka buyer) ID is required")
         self.agency_id = agency_id
+
+    def get_sellers(self, user_id=None):
+        """
+        As a buyer, view all the sellers for which I have access to send orders.
+        """
+        if user_id == None:
+            raise PATSException("User ID is required")
+
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.security-v1+json',
+            'X-MO-User-ID': user_id
+        }
+        path = '/vendors?agencyId=%s' % self.agency_id
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        # TODO: Parse the response and return something more intelligible
+        return js
+
+    def get_users_for_seller(self, user_id=None, vendor_id=None):
+        """
+        As a buyer, view all the sellers to whom I can send orders at the
+        given vendor.
+        """
+        if user_id == None:
+            raise PATSException("User ID is required")
+        if vendor_id == None:
+            raise PATSException("Vendor ID is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.security-v1+json',
+            'X-MO-User-ID': user_id
+        }
+        path = '/users?appName=pats&agencyId=%s&vendorId=%s' % (self.agency_id, vendor_id)
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        # TODO: Parse the response and return something more intelligible
+        return js
 
     def create_campaign(self, campaign_details=None, **kwargs):
         """
@@ -316,6 +360,9 @@ class PATSBuyer(PATSAPIClient):
 
         
     def view_order_detail(self, buyer_email=None, order_public_id=None):
+        """
+        As a buyer, view the detail of one order.
+        """
         # /agencies/{agency public id}/orders/{External Order Id}/revisions
         if buyer_email == None:
             raise PATSException("Buyer email is required")
@@ -340,7 +387,7 @@ class PATSBuyer(PATSAPIClient):
         if order_id == None:
             raise PATSException("Order ID is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.prisma-v1+json',
+            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
             'X-MO-Company-ID': company_id,
             'X-MO-Organization-ID': self.agency_id
         }
