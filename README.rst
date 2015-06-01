@@ -13,7 +13,7 @@ Installing from pypi (using pip - not ready yet)::
 
 Installing from github::
 
-    pip install -e git://github.com/bquinn/.git#egg=pats-api-python
+    pip install -e git://github.com/bquinn/pats-api-python.git#egg=pats-api-python
 
 Usage
 -----
