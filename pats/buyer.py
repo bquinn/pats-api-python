@@ -30,6 +30,7 @@ Based on Mediaocean PATS API documented at https://developer.mediaocean.com/
 
 from collections import OrderedDict
 from httplib import HTTPSConnection
+import datetime
 import json
 import os
 import re
@@ -334,6 +335,10 @@ class PATSBuyer(PATSAPIClient):
         """
         if start_date == None:
             raise PATSException("Start date is required")
+        if not isinstance(start_date, datetime.datetime) and not (isinstance(start_date, datetime.date)):
+            raise PATSException("Start date must be a Python date or datetime object")
+        if not isinstance(end_date, datetime.datetime) and not (isinstance(end_date, datetime.date)):
+            raise PATSException("If end date exists it must be a Python date or datetime object")
         if buyer_email == None:
             raise PATSException("Buyer email is required")
 

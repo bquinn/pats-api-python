@@ -35,7 +35,7 @@ import os
 import re
 import string
 from urllib import urlencode
-from .core import PATSAPIClient, PATSException
+from .core import PATSAPIClient, PATSException, JSONSerializable
 
 PUBLISHER_API_DOMAIN = 'demo-publishers.api.mediaocean.com'
 
@@ -393,6 +393,38 @@ class PATSSeller(PATSAPIClient):
         }
         pass
 
+    def respond_to_order(self, user_id=None, order_id=None, status=None, comments=None):
+        """
+        As a seller, Accept or Reject an order from a buyer.
+        """
+        if user_id == None:
+            raise PATSException("User ID (seller email) is required")
+        if order_id == None:
+            raise PATSException("Order ID is required")
+        if status == None or status not in ("Accepted", "Rejected"):
+            raise PATSException("status (\"Accepted\" or \"Rejected\") is required")
+        if comments == None or comments == "":
+            raise PATSException("comments are required for accepting or rejecting an order")
+
+        extra_headers = {
+            'X-MO-User-Id': user_id,
+            'Accept': 'application/vnd.mediaocean.order-v1+json'
+        }
+        data = {
+            "status": status,
+            "comments": comments
+        }
+
+        js = self._send_request(
+            "PUT",
+            PUBLISHER_API_DOMAIN,
+            '/vendors/%s/orders/%s/respond' % (self.vendor_id, order_id),
+            extra_headers,
+            json.dumps(data)
+        )
+        # Should parse the response and return something more intelligible
+        return js
+
     def view_rfps(self, start_date=None, end_date=None):
         """
         As a seller, view all RFPs from buyers.
@@ -471,7 +503,7 @@ class PATSSeller(PATSAPIClient):
             extra_headers,
             json.dumps(data)
         )
-        if 'validationResult' in js:
+        if 'validationResult' in js and js['validationResult']['validationFailedDto'] != None:
             errorStr = "Create proposal failed:\n"
             for type in js['validationResult']:
                 errors = js['validationResult'][type]
@@ -484,3 +516,87 @@ class PATSSeller(PATSAPIClient):
             raise PATSException(errorStr)
         return js
 
+class ProposalLineItem(JSONSerializable):
+    """
+    This shouldn't be necessary - proposal line items should be the same as order ones.
+    But for now this is necessary.
+    """
+    lineItemExternalId = None
+    productId = None
+    productName = None
+    section = None
+    subsection = None
+    units = None
+    subMediaType = None
+    unitType = None
+    rate = None
+    costMethod = None
+
+    def __init__(self, *args, **kwargs):
+        self.lineItemExternalId = kwargs.get('lineItemExternalId', '')
+        self.productId = kwargs.get('productId', '')
+        self.productName = kwargs.get('productName', '')
+        self.section = kwargs.get('section', '')
+        self.subsection = kwargs.get('subsection', '')
+        self.units = kwargs.get('units', '')
+        self.subMediaType = kwargs.get('subMediaType', '')
+        self.unitType = kwargs.get('unitType', '')
+        self.rate = kwargs.get('rate', '')
+        self.costMethod = kwargs.get('costMethod', '')
+
+    def dict_repr(self):
+        dict = {
+            # called "externalPlacementId" for orders
+            "lineItemExternalId":self.lineItemExternalId,
+            # same in orders
+            "productId":self.productId,
+            "productName": self.productName,
+            "section":self.section,
+            "subsection":self.subsection,
+            "units":self.units,
+            "subMediaType":self.subMediaType,
+            "unitType":self.unitType,
+            "rate":self.rate,
+            "costMethod":self.costMethod,
+        }
+        return dict
+
+class ProposalLineItemDigital(ProposalLineItem):
+    """
+    Again, this shouldn't be necessary - get rid of it ASAP!
+    """
+    site = None
+    buyCategory = None
+    dimensionsAndPosition = None
+    flightStart = None
+    flightEnd = None
+
+    # for validation
+    possible_buy_categories_online = [
+        'Display Standard', 'Rich Media', 'Mobile', 'Video', 'Package','Roadblock',
+        'Interstitial','In-Game', 'Social', 'Sponsorship', 'Tablet', 'Text', 'Custom-Other'
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(ProposalLineItemDigital, self).__init__(*args, **kwargs)
+        self.site = kwargs.get('site', '')
+        self.buyCategory = kwargs.get('buyCategory', '')
+        self.dimensionsAndPosition = kwargs.get('dimensionsAndPosition', '')
+        self.flightStart = kwargs.get('flightStart', '')
+        self.flightEnd = kwargs.get('flightEnd', '')
+        #if self.buyCategory not in self.possible_buy_categories_online:
+        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
+
+    def dict_repr(self, *args, **kwargs):
+        dict = super(ProposalLineItemDigital, self).dict_repr(*args, **kwargs)
+        dict.update({
+            "site":self.site,
+            "buyCategory":self.buyCategory,
+            "dimensionsAndPosition":self.dimensionsAndPosition,
+            "flightStart":self.flightStart.strftime("%Y-%m-%d"),
+            "flightEnd":self.flightEnd.strftime("%Y-%m-%d")
+        })
+        return dict
+
+class ProposalLineItemPrint(ProposalLineItem):
+    pass

@@ -7,11 +7,7 @@ Python API wrapper for PATS, the Publishers Advertising Transaction System
 Installation
 ------------
 
-Installing from pypi (using pip - not ready yet)::
-
-    pip install pats
-
-Installing from github::
+Installing from github (installing from pypi isn't ready yet)::
 
     pip install -e git://github.com/bquinn/pats-api-python.git#egg=pats-api-python
 
@@ -149,6 +145,7 @@ Seller side:
 
   * View orders between dates: ``view_orders(start_date, end_date)``
   * View detail of an order: ``view_order_detail(order_id)``
+  * Accept or reject an order: ``respond_to_order(user_id, order_id, status, comments)``
 
 * RFPs:
 

@@ -310,13 +310,6 @@ class InsertionOrderLineItem(JSONSerializable):
     buyCategory = None # "Standard",
     packageType = None # "Standalone",
 
-    possible_buy_categories_fee = [
-        'Fee - Ad Serving', 'Fee - Ad Verification', 'Fee - Data', 'Fee - Mobile',
-        'Fee - Privacy Icon', 'Fee - Production', 'Fee - Research', 'Fee - Search',
-        'Fee - Sponsorship', 'Fee - Tax', 'Fee - Technology', 'Fee - Viewability',
-        'Fee – Other'
-    ]
-
     possible_operations = [
         'Add',
         'Update',
@@ -419,11 +412,11 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
         self.copyDeadline = kwargs.get('copyDeadline', None)
         self.sizeNumCols = kwargs.get('sizeNumCols', None)
         self.sizeNumUnits = kwargs.get('sizeNumUnits', None)
-        if self.buyCategory not in self.possible_buy_categories_print:
-            raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        #if self.buyCategory not in self.possible_buy_categories_print:
+        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
-    def dict_repr(self):
-        dict = super(InsertionOrderLineItemPrint, self).dict_repr()
+    def dict_repr(self, *args, **kwargs):
+        dict = super(InsertionOrderLineItemPrint, self).dict_repr(*args, **kwargs)
         printInsertion = {
                 "size": self.size,
                 "color": self.color,
@@ -465,6 +458,10 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
 class InsertionOrderLineItemDigital(InsertionOrderLineItem):
     # for validation
     possible_buy_categories_online = [
+        'Fee - Ad Serving', 'Fee - Ad Verification', 'Fee - Data', 'Fee - Mobile',
+        'Fee - Privacy Icon', 'Fee - Production', 'Fee - Research', 'Fee - Search',
+        'Fee - Sponsorship', 'Fee - Tax', 'Fee - Technology', 'Fee - Viewability',
+        'Fee – Other',
         'Display Standard', 'Rich Media', 'Mobile', 'Video', 'Package','Roadblock',
         'Interstitial','In-Game', 'Social', 'Sponsorship', 'Tablet', 'Text', 'Custom-Other'
     ]
@@ -493,8 +490,8 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
         self.servedBy = kwargs.get('servedBy', '')
         self.bookingCategoryName = kwargs.get('bookingCategoryName', '')
         self.flighting = kwargs.get('flighting', [])
-        #if self.buyCategory not in self.possible_buy_categories_online:
-        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        if self.buyCategory not in self.possible_buy_categories_online:
+            raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
     def dict_repr(self):
         dict = super(InsertionOrderLineItemDigital, self).dict_repr()
