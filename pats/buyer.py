@@ -331,7 +331,13 @@ class PATSBuyer(PATSAPIClient):
 
     def view_orders(self, buyer_email=None, start_date=None, end_date=None):
         """
-        As a buyer, view all orders I have sent.
+        TODO - Mediaocean need to create an API for this!!
+        """
+        pass
+
+    def view_order_revisions(self, buyer_email=None, start_date=None, end_date=None):
+        """
+        As a buyer, view all order revisions sent to me.
         """
         if start_date == None:
             raise PATSException("Start date is required")

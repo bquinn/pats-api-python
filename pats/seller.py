@@ -325,7 +325,9 @@ class PATSSeller(PATSAPIClient):
 
     def view_orders(self, start_date=None, end_date=None):
         """
-        As a seller, view all orders received from buyers.
+        As a seller, view all order revisions that I have created.
+        (Seems like an odd thing to want to do, this was supposed to be "view orders"
+        but that doesn't actually exist yet!)
         """
         if start_date == None:
             raise PATSException("Start date is required")
@@ -350,19 +352,21 @@ class PATSSeller(PATSAPIClient):
         # TODO: Parse the response and return something more intelligible
         return js
 
-    def view_order_detail(self, order_id=None):
+    def view_order_detail(self, order_id=None, version=None):
         """
-        As a seller, view all orders received from buyers.
+        As a seller, view detail of an order version.
         """
         if order_id == None:
             raise PATSException("order ID is required")
+        if version == None:
+            raise PATSException("version is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json'
         }
         js = self._send_request(
             "GET",
             PUBLISHER_API_DOMAIN,
-            '/vendors/%s/orders/%s/history' % (self.vendor_id, order_id),
+            '/vendors/%s/orders/%s?version=%s' % (self.vendor_id, order_id, version),
             extra_headers
         )
         # TODO: Parse the response and return something more intelligible
