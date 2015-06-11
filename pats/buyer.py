@@ -293,7 +293,7 @@ class PATSBuyer(PATSAPIClient):
         # TODO
         pass
 
-    def list_products(self, vendor_id=None, start_index=None, max_results=None, include_logo=False):
+    def list_products(self, vendor_id=None, user_id=None, start_index=None, max_results=None, include_logo=False):
         """
         List products in a vendor's product catalogue.
 
@@ -305,6 +305,13 @@ class PATSBuyer(PATSAPIClient):
         """
         if vendor_id is None:
             raise PATSException("Vendor ID is required")
+        if user_id is None:
+            raise PATSException("User ID is required")
+
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.catalog-v1+json',
+            'X-MO-User-Id': user_id
+        }
 
         params = {}
         if start_index:
@@ -319,12 +326,10 @@ class PATSBuyer(PATSAPIClient):
             "GET",
             AGENCY_API_DOMAIN,
             "/agencies/%s/vendors/%s/products/?%s" % (self.agency_id, vendor_id, params),
-            extra_headers,
-            json.dumps(data)
+            extra_headers
         )
-        if js['validationResults']:
-            raise PATSException("Product ID "+js['validationResults'][0]['productId']+": error is "+js['validationResults'][0]['message'])
-        productId = js['products'][0]['productPublicId']
+        # result looks like
+        # {"total":117,"products":[{"vendorPublicId":"35-EEBMG4J-4","productPublicId":"PC-11TU", ... }
         return js
 
     def create_order(self, **kwargs):
@@ -344,14 +349,6 @@ class PATSBuyer(PATSAPIClient):
         if not isinstance(insertion_order, InsertionOrderDetails):
             raise PATSException("insertion_order_details must be an instance of InsertionOrderDetails")
 
-        extra_headers = {}
-        extra_headers.update({
-            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
-            'X-MO-Company-ID': kwargs.get('company_id'),
-            'X-MO-Person-ID': kwargs.get('person_id'),
-            'X-MO-Organization-ID': self.agency_id
-        })
-
         # order payload
         data = {
             'externalCampaignId':kwargs.get('external_campaign_id', None),
@@ -367,6 +364,17 @@ class PATSBuyer(PATSAPIClient):
             data.update({
                 'lineItems':line_items
             })
+
+        return self.create_order_raw(data)
+
+    def create_order_raw(self, company_id=None, person_id=None, data=None):
+        extra_headers = {}
+        extra_headers.update({
+            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
+            'X-MO-Company-ID': kwargs.get('company_id'),
+            'X-MO-Person-ID': kwargs.get('person_id'),
+            'X-MO-Organization-ID': self.agency_id
+        })
 
         # send request
         js = self._send_request(
