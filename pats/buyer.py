@@ -218,14 +218,37 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def search_rfps(self, sender_user_id):
+    def search_rfps(self, user_id=None, advertiser_name=None, campaign_urn=None, rfp_start_date=None,rfp_end_date=None,response_due_date=None,status=None):
         # /agencies/35-1-1W-1/rfps?advertiserName=Jaguar Land Rover&campaignUrn=someUrn&rfpStartDate=2014-08-10&rfpEndDate=2015-01-10&responseDueDate=2015-08-25&status=SENT
+        if user_id is None:
+            raise PATSException("User ID is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
-            'X-MO-User-Id': sender_user_id
+            'X-MO-User-Id': user_id
         }
-        # TODO
-        pass
+        path = '/agencies/%s/rfps' % self.agency_id
+        if advertiser_name or campaign_urn or rfp_start_date or rfp_end_date or response_due_date or status:
+            path += "?"
+        if advertiser_name:
+            path += "advertiserName=%s&" % advertiser_name
+        if campaign_urn:
+            path += "campaignUrn=%s&" % campaign_urn
+        if rfp_start_date:
+            path += "rfpStartDate=%s&" % rfp_start_date
+        if rfp_end_date:
+            path += "rfpEndDate=%s&" % rfp_end_date
+        if response_due_date:
+            path += "responseDueDate=%s&" % response_due_date
+        if status:
+            path += "status=%s&" % status
+
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        return js
 
     def get_proposal_attachment(self, sender_user_id=None, proposal_public_id=None, attachment_id=None):
         extra_headers = {
