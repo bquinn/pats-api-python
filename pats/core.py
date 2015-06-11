@@ -143,7 +143,7 @@ class PATSAPIClient(object):
                 "Bad Request. The parameters you provided did not validate")
         elif error_code == 401:
             raise PATSException(
-                "%s Probably invalid API key %s" % (reason, self.api_key))
+                "%s Possibly invalid API key %s" % (reason, self.api_key))
         elif error_code == 404:
             raise PATSException(
                 "Not found: %s" % reason)
