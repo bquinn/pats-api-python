@@ -77,8 +77,34 @@ class PATSBuyer(PATSAPIClient):
             path,
             extra_headers
         )
-        # TODO: Parse the response and return something more intelligible
         return js
+
+    def get_buyers(self, user_id=None, agency_id=None, name=None, last_updated_date=None):
+        """
+        As a buyer user, list the details of all agencies I represent.
+        """
+        if user_id == None:
+            raise PATSException("User ID is required")
+        if agency_id == None:
+            # use default agency ID if none specified
+            agency_id = self.agency_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.security-v1+json',
+            'X-MO-User-ID': user_id,
+        }
+        path = '/agencies?agencyId=%s' % agency_id
+        if name:
+            path += "&name=%s" % name
+        if last_updated_date:
+            path += "&lastUpdatedDate=%s" % last_updated_date
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        return js
+
 
     def get_users_for_seller(self, user_id=None, vendor_id=None):
         """
