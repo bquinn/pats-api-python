@@ -152,8 +152,8 @@ class PATSBuyer(PATSAPIClient):
             extra_headers,
             campaign_details.json_repr()
         )
-        campaignId = js['campaignId']
-        return campaignId
+        # return full js object so we can parse errors
+        return js
 
     def view_campaign_detail(self, sender_user_id, campaign_public_id):
         # aka "view RFPs for campaign"
@@ -367,13 +367,15 @@ class PATSBuyer(PATSAPIClient):
 
         return self.create_order_raw(data)
 
-    def create_order_raw(self, company_id=None, person_id=None, data=None):
+    def create_order_raw(self, agency_id=None, company_id=None, person_id=None, data=None):
+        if agency_id==None:
+            agency_id=self.agency_id # default but can be overridden
         extra_headers = {}
         extra_headers.update({
             'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
-            'X-MO-Company-ID': kwargs.get('company_id'),
-            'X-MO-Person-ID': kwargs.get('person_id'),
-            'X-MO-Organization-ID': self.agency_id
+            'X-MO-Company-ID': company_id,
+            'X-MO-Person-ID': person_id,
+            'X-MO-Organization-ID': agency_id
         })
 
         # send request
@@ -426,7 +428,6 @@ class PATSBuyer(PATSAPIClient):
         # TODO: Parse the response and return something more intelligible
         return js
 
-        
     def view_order_detail(self, buyer_email=None, order_public_id=None):
         """
         As a buyer, view the detail of one order.

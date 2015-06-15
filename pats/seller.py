@@ -273,15 +273,15 @@ class PATSSeller(PATSAPIClient):
 
         return self.save_product_data(data)
 
-    def get_agency_by_id(self, agency_id=None, user_id=None, last_updated_date=None):
+    def get_agency_by_id(self, agency_id=None, user_id=None, name=None, last_updated_date=None):
         """
         As a seller, view detail about the specified agency.
         BROKEN - bug no PATS-880
         """
-        if agency_id == None:
-            raise PATSException("Agency ID is required")
-        if user_id == None:
-            raise PATSException("User ID is required")
+        #if agency_id == None:
+        #    raise PATSException("Agency ID is required")
+        #if user_id == None:
+        #    raise PATSException("User ID is required")
 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.security-v1+json',
@@ -290,6 +290,8 @@ class PATSSeller(PATSAPIClient):
         path = '/agencies?agencyId=%s' % agency_id
         if last_updated_date:
             path += "&lastUpdatedDate="+last_updated_date.strftime("%Y-%m-%d")
+        if name:
+            path += "&name="+name
         js = self._send_request(
             "GET",
             PUBLISHER_API_DOMAIN,

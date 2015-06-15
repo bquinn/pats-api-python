@@ -213,8 +213,12 @@ class CampaignDetails(JSONSerializable):
                 "CampaignSourceID": self.external_campaign_id
             }
         }
-        # we want to end up with
+        if self.campaign_budget and (self.print_campaign_budget or self.digital_campaign_budget):
+            raise PATSException("Campaign can't have both individual budgets and a campaign budget")
+        # we want to end up with either
         # "MediaBudget": { "Medias": { "Media": [ { "MediaMix": "Online" }, {"MediaMix": "Print" } ] }, "CampaignBudget": 50000 }
+        # or
+        # "MediaBudget": { "Medias": { "Media": [ { "MediaMix": "Online", "Budget": 50000.00 } ] } }
         media_budget = {}
         if self.campaign_budget:
             media_budget.update({
@@ -222,13 +226,15 @@ class CampaignDetails(JSONSerializable):
             })
         medias = []
         if self.print_campaign:
-            medias.append({ "MediaMix": "Print" })
-        if self.print_campaign_budget:
-            pass #TODO
+            print_campaign = {"MediaMix": "Print"}
+            if self.print_campaign_budget:
+                print_campaign.update({"Budget": self.print_campaign_budget})
+            medias.append(print_campaign)
         if self.digital_campaign:
-            medias.append({ "MediaMix": "Online" })
-        if self.digital_campaign_budget:
-            pass #TODO
+            digital_campaign = {"MediaMix": "Online"}
+            if self.digital_campaign_budget:
+                digital_campaign.update({"Budget": self.digital_campaign_budget})
+            medias.append(digital_campaign)
         media_budget.update({ "Medias": { "Media": medias } })
         dict.update({'MediaBudget': media_budget})
         return dict
