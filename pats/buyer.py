@@ -341,8 +341,13 @@ class PATSBuyer(PATSAPIClient):
             from the person named as the buyer contact in the order)
         insertion_order_details: info about the insertion order (must be an InsertionOrderDetails object)
         """
+        # has default but can be overridden
+        agency_id = kwargs.get('agency_id', self.agency_id)
         if kwargs.get('company_id') == None:
             raise PATSException("Company ID is required")
+        company_id = kwargs.get('company_id')
+        # person_id is optional
+        person_id = kwargs.get('person_id', None)
         if kwargs.get('insertion_order_details') == None:
             raise PATSException("Insertion Order object is required")
         insertion_order = kwargs.get('insertion_order_details', None)
@@ -365,7 +370,7 @@ class PATSBuyer(PATSAPIClient):
                 'lineItems':line_items
             })
 
-        return self.create_order_raw(data)
+        return self.create_order_raw(agency_id=agency_id, company_id=company_id, person_id=person_id, data=data)
 
     def create_order_raw(self, agency_id=None, company_id=None, person_id=None, data=None):
         if agency_id==None:
