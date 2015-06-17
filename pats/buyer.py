@@ -169,7 +169,7 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def submit_rfp(self, sender_user_id=None, campaign_public_id=None, budget_amount=None, start_date=None, end_date=None, respond_by_date=None, comments="", publisher_id=None, publisher_emails=None, media=None, strategy=None, requested_products=None):
+    def submit_rfp(self, sender_user_id=None, campaign_public_id=None, budget_amount=None, start_date=None, end_date=None, respond_by_date=None, comments="", publisher_id=None, publisher_emails=None, media_print=None, media_online=None, strategy=None, requested_products=None):
         """
         Send an RFP to one or more publishers.
         Can optionally include product IDs.
@@ -178,6 +178,11 @@ class PATSBuyer(PATSAPIClient):
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
             'X-MO-User-Id': sender_user_id
         }
+        media = []
+        if media_print:
+            media.append('Print')
+        if media_online:
+            media.append('Online')
         data = {
             'agencyPublicId': self.agency_id,
             'campaignPublicId': campaign_public_id,
@@ -194,11 +199,12 @@ class PATSBuyer(PATSAPIClient):
                     'emails': publisher_emails,
                 }
             ],
-            'media': media, # Array of one or more of 'Print', 'Online'
+            'media': media,
             'strategy': strategy, # must be one of defined set of terms
-            'requestedProducts': requested_products,
             # TODO: handle attachments
         }
+        if requested_products and requested_products != '':
+            data.update({ 'requestedProducts': requested_products })
         js = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,
@@ -207,11 +213,6 @@ class PATSBuyer(PATSAPIClient):
             json.dumps(data)
         )
         return js
-
-    def submit_product_rfp(self):
-        # TODO
-        # /agencies/{agencyPublicId}/campaigns/{campaignPublicId}/rfps
-        pass
 
     def view_rfp_detail(self, sender_user_id=None, rfp_id=None):
         if rfp_id is None:
