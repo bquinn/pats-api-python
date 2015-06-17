@@ -105,8 +105,12 @@ class PATSAPIClient(object):
 
         js = json.JSONDecoder().decode(response_text)
 
-        if response_status == 422 and 'message' in js:
-            self._relay_error(js['code'], js['message'])
+        if response_status == 422:
+            if 'message' in js:
+                self._relay_error(js['code'], js['message'])
+            else:
+                # if we didn't get a JSON payload (eg Create RFP), just report the whole response
+                self._relay_error(response_status, response_text)
         # sometimes the call returns 200 but then have a "FAILED" message in the response
         if 'status' in js and js['status'] == 'FAILED':
             errorString = ""
