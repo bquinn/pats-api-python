@@ -374,20 +374,24 @@ class PATSSeller(PATSAPIClient):
         # TODO: Parse the response and return something more intelligible
         return js
 
-    def view_order_history(self, order_id=None):
-        # TODO - docs being released on 9 March apparently...
+    def view_order_history(self, order_id=None, full=False):
+        """
+        As a seller, view the full history (ie all old versions) of an order.
+        """
         if order_id == None:
             raise PATSException("order ID is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json'
         }
+        path = '/vendors/%s/orders/%s/history' % (self.vendor_id, order_id)
+        if full:
+            path += "?full=true"
         js = self._send_request(
             "GET",
             PUBLISHER_API_DOMAIN,
-            '/vendors/%s/orders/%s/history' % (self.vendor_id, order_id),
+            path,
             extra_headers
         )
-        # Should parse the response and return something more intelligible
         return js
         
     def send_order_revision(self, order_id=None):
