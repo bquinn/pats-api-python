@@ -502,6 +502,15 @@ class PATSSeller(PATSAPIClient):
             }
         }
 
+        return self.send_proposal_raw(vendor_id=self.vendor_id, data=data)
+
+    def send_proposal_raw(self, vendor_id=None, data=None):
+        """
+        As a seller, send a proposal in response to a buyer's RFP using a raw payload
+        Used directly by API tester app.
+        """
+        if vendor_id == None:
+            raise PATSException("Vendor (aka publisher) ID is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.proposal-v1+json'
         }
@@ -509,11 +518,16 @@ class PATSSeller(PATSAPIClient):
         js = self._send_request(
             "POST",
             PUBLISHER_API_DOMAIN,
-            "/vendors/%s/proposals" % self.vendor_id,
+            "/vendors/%s/proposals" % vendor_id,
             extra_headers,
             json.dumps(data)
         )
-        if 'validationResult' in js and js['validationResult']['validationFailedDto'] != None:
+        # an invalid response is
+        # "{"validationResult":{"digitalLineItems":{"1":[{"message":"...","fieldName":"..."}],"2":[...]},"printLineItems":{"1":[{"message":"...","fieldName":"..."}],"2":[...]},"validationFailedDto":null}}"
+        # a valid response is
+        # {"validationResult":{"digitalLineItems":{},"printLineItems":{},"validationFailedDto":null}}
+        # although we have some bugs that make valid responses come back with weird errors
+        if 'validationResult' in js and js['validationResult']['digitalLineItems'] != None:
             errorStr = "Create proposal failed:\n"
             for type in js['validationResult']:
                 errors = js['validationResult'][type]
