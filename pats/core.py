@@ -410,9 +410,14 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
 
     # for validation
     possible_buy_categories_print = [
-        'Magazine', 'Newspaper', 'Supplement', 'Consumer', 'Classified - National', 'Direct Mail',
-        'Trade', 'Classified - Regional', 'Directories, i.e. Yellow Pages', 'Display – National',
-        'Inserts', 'Display - Regional', 'Sponsorship'
+        # implied buyType: Newspaper
+        'Consumer', 'Trade',
+        # implied buyType: Magazine
+        'Classified - National', 'Classified - Regional', 'Display - National', 'Display - Regional',
+        # implied buyType: Supplement
+        'Direct Mail', 'Directories, i.e. Yellow Pages', 'Inserts', 'Sponsorship',
+        # implied buyType: Fee
+        'Production'
     ]
 
     publication = None # "Time",
@@ -447,8 +452,8 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
         self.copyDeadline = kwargs.get('copyDeadline', None)
         self.sizeNumCols = kwargs.get('sizeNumCols', None)
         self.sizeNumUnits = kwargs.get('sizeNumUnits', None)
-        #if self.buyCategory not in self.possible_buy_categories_print:
-        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        if self.buyCategory not in self.possible_buy_categories_print:
+            raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
     def dict_repr(self, *args, **kwargs):
         dict = super(InsertionOrderLineItemPrint, self).dict_repr(*args, **kwargs)
