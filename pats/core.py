@@ -100,7 +100,7 @@ class PATSAPIClient(object):
                 curl += '-H "%s: %s" ' % (header_name, header_value)
             if method == "POST" or method == "PUT":
                 curl += '--data "%s" ' % body
-            curl += 'https://%s/%s' % (domain, path)
+            curl += 'https://%s%s' % (domain, path)
             self.session['curl_command'] = curl
              
         # Perform the request and get the response headers and content
