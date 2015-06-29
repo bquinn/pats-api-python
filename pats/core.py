@@ -37,7 +37,7 @@ import re
 import string
 from urllib import urlencode
 
-VERSION = '0.3'
+VERSION = '0.4'
 
 class PATSException(Exception):
     pass
@@ -54,13 +54,23 @@ class PATSAPIClient(object):
     # debugging mode flag
     debug_mode = False
 
-    def __init__(self, api_key, debug_mode=False):
+    # raw_mode - update information about raw request and response payloads
+    raw_mode = False
+
+    # session - if we need to write info to the session, it will be injected in the constructor
+    session = None
+
+    def __init__(self, api_key, debug_mode=False, raw_mode=False, session=None):
         """
         Initialize a PATS instance.
         """
         self.api_key = api_key
         if debug_mode:
             self.debug_mode = True
+        if raw_mode:
+            self.raw_mode = True
+        if session:
+            self.session = session
 
     def _get_headers(self, extra_headers):
         # Set User-Agent
@@ -80,8 +90,20 @@ class PATSAPIClient(object):
         if self.debug_mode:
             h.set_debuglevel(10)
 
-        # Perform the request and get the response headers and content
+        # Construct the request headers
         headers = self._get_headers(extra_headers)
+
+        curl = ''
+        if self.raw_mode and self.session:
+            curl = 'curl -v -X "%s" ' % method
+            for header_name, header_value in headers.iteritems():
+                curl += '-H "%s: %s" ' % (header_name, header_value)
+            if method == "POST" or method == "PUT":
+                curl += '--data "%s" ' % body
+            curl += 'https://%s/%s' % (domain, path)
+            self.session['curl_command'] = curl
+             
+        # Perform the request and get the response headers and content
         h.request(method,
                   path,
                   body,
@@ -89,6 +111,9 @@ class PATSAPIClient(object):
         response = h.getresponse()
         response_status = response.status
         response_text = response.read()
+        if self.raw_mode and self.session:
+            self.session['response_status'] = response_status
+            self.session['response_text'] = response_text
 
         if self.debug_mode:
             print "DEBUG: response status is %d, full response is" % response_status

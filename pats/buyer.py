@@ -45,7 +45,7 @@ VERSION = '0.1'
 class PATSBuyer(PATSAPIClient):
     agency_id = None
 
-    def __init__(self, agency_id=None, api_key=None, debug_mode=False):
+    def __init__(self, agency_id=None, api_key=None, debug_mode=False, raw_mode=False, session=None):
         """
         Create a new buyer-side PATS API object.
 
@@ -53,8 +53,12 @@ class PATSBuyer(PATSAPIClient):
         - agency_id (required) : ID of the agency (buyer) whose catalogue
           you are updating.
         - api_key (required) : API Key with buyer access
+        - debug_mode (boolean) : Output full details of HTTP requests and responses
+        - raw_mode (boolean) : Store output of request (as 'curl' equivalent) and
+                               response (JSON payload) when making requests
+        - session (optional) : User session in which to write curl and response objects in raw mode
         """
-        super(PATSBuyer, self).__init__(api_key, debug_mode)
+        super(PATSBuyer, self).__init__(api_key, debug_mode, raw_mode, session)
         if agency_id == None:
             raise PATSException("Agency (aka buyer) ID is required")
         self.agency_id = agency_id

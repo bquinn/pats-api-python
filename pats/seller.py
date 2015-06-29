@@ -42,7 +42,7 @@ PUBLISHER_API_DOMAIN = 'demo-publishers.api.mediaocean.com'
 class PATSSeller(PATSAPIClient):
     vendor_id = None
 
-    def __init__(self, vendor_id=None, api_key=None, debug_mode=False):
+    def __init__(self, vendor_id=None, api_key=None, debug_mode=False, raw_mode=False, session=None):
         """
         Create a new seller-side PATS API object.
 
@@ -50,8 +50,12 @@ class PATSSeller(PATSAPIClient):
         - vendor_id (required) : ID of the vendor (publisher) whose catalogue
           you are updating.
         - api_key (required) : API Key with seller access
+        - debug_mode (boolean) : Output full details of HTTP requests and responses
+        - raw_mode (boolean) : Store output of request (as 'curl' equivalent) and
+                               response (JSON payload) when making requests
+        - session (optional) : User session in which to write curl and response objects in raw mode
         """
-        super(PATSSeller, self).__init__(api_key, debug_mode)
+        super(PATSSeller, self).__init__(api_key, debug_mode, raw_mode, session)
         if vendor_id == None:
             raise PATSException("Vendor (aka publisher) ID is required")
         self.vendor_id = vendor_id
@@ -402,6 +406,26 @@ class PATSSeller(PATSAPIClient):
             'Accept': 'application/vnd.mediaocean.order-v1+json'
         }
         pass
+
+    def send_order_revision_raw(self, agency_id=None, company_id=None, person_id=None, data=None):
+        if vendor_id==None:
+            vendor_id=self.vendor_id # default but can be overridden
+        extra_headers = {}
+        extra_headers.update({
+            'Accept': 'application/vnd.mediaocean.order-v1.0+json',
+        })
+
+        path = '/vendors/%s/orders/%s/revisions' % (self.vendor_id, self.order_id)
+
+        # send request
+        js = self._send_request(
+            "POST",
+            PUBLISHER_API_DOMAIN,
+            path,
+            extra_headers,
+            json.dumps(data)
+        )
+        return js
 
     def respond_to_order(self, user_id=None, order_id=None, status=None, comments=None):
         """
