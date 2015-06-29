@@ -128,6 +128,10 @@ class PATSAPIClient(object):
         if response_status != 200 and response_status != 422:
             self._relay_error(response_status, response.reason)
 
+        js = None
+        if response_text == '':
+            return ''
+
         js = json.JSONDecoder().decode(response_text)
 
         if response_status == 422:
