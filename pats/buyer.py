@@ -294,9 +294,30 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def return_proposal(self):
-        # TODO
-        pass
+    def return_proposal(self, sender_user_id=None, proposal_public_id=None, comments=None, due_date=None, emails=None, attachments=None):
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'X-MO-User-Id': sender_user_id
+        }
+        if proposal_public_id is None:
+            raise PATSException("Proposal ID is required")
+        data = {
+            'comments': comments,
+            'dueDate': due_date.strftime("%Y-%m-%d"),
+            'emails': emails,
+        }
+        if attachments:
+            data.update({
+                'attachments': attachments
+            })
+        js = self._send_request(
+            "PUT",
+            AGENCY_API_DOMAIN,
+            "/agencies/%s/proposals/%s/return" % (self.agency_id, proposal_public_id),
+            extra_headers,
+            json.dumps(data)
+        )
+        return js
 
     def list_products(self, vendor_id=None, user_id=None, start_index=None, max_results=None, include_logo=False):
         """
