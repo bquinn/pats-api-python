@@ -407,15 +407,17 @@ class PATSSeller(PATSAPIClient):
         }
         pass
 
-    def send_order_revision_raw(self, agency_id=None, company_id=None, person_id=None, data=None):
+    def send_order_revision_raw(self, vendor_id=None, order_id=None, person_id=None, data=None):
         if vendor_id==None:
             vendor_id=self.vendor_id # default but can be overridden
+        if order_id == None:
+            raise PATSException("Order ID is required")
         extra_headers = {}
         extra_headers.update({
             'Accept': 'application/vnd.mediaocean.order-v1.0+json',
         })
 
-        path = '/vendors/%s/orders/%s/revisions' % (self.vendor_id, self.order_id)
+        path = '/vendors/%s/orders/%s/revisions' % (vendor_id, order_id)
 
         # send request
         js = self._send_request(
