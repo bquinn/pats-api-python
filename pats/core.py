@@ -98,9 +98,14 @@ class PATSAPIClient(object):
             curl = 'curl -v -X "%s" ' % method
             for header_name, header_value in headers.iteritems():
                 curl += '-H "%s: %s" ' % (header_name, header_value)
-            if method == "POST" or method == "PUT":
-                curl += '--data "%s" ' % body
-            curl += 'https://%s%s' % (domain, path)
+            if body:
+                # we want to turn ' into '"'"' for curl output so we need to do this!
+                match = re.compile("'")
+                curl_body = match.sub("'\"'\"'", body)
+                if method == "POST" or method == "PUT":
+                    curl += "--data '%s' " % curl_body
+            # escape the url in double-quotes because it might contain & characters
+            curl += '"https://%s%s"' % (domain, path)
             self.session['curl_command'] = curl
              
         # Perform the request and get the response headers and content
