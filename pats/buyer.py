@@ -236,7 +236,9 @@ class PATSBuyer(PATSAPIClient):
         return js
 
     def get_rfp_attachment(self, sender_user_id=None, rfp_id=None, attachment_id=None):
-        # is this for both buyer and seller side?
+        """
+        Get an attachment from an RFP.
+        """
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
             'X-MO-User-Id': sender_user_id
@@ -281,7 +283,16 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def get_proposal_attachment(self, sender_user_id=None, proposal_public_id=None, attachment_id=None):
+    def get_proposal_attachment(self, sender_user_id=None, proposal_id=None, attachment_id=None):
+        """
+        Get contents of proposal attachment based on the proposal ID.
+        """
+        if sender_user_id is None:
+            raise PATSException("Sender-User-ID is required")
+        if proposal_id is None:
+            raise PATSException("Proposal ID is required")
+        if attachment_id is None:
+            raise PATSException("Attachment ID is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
             'X-MO-User-Id': sender_user_id
@@ -289,7 +300,7 @@ class PATSBuyer(PATSAPIClient):
         js = self._send_request(
             "GET",
             AGENCY_API_DOMAIN,
-            "/agencies/%s/proposals/%s/attachments/%s" % (self.agency_id, proposal_public_id, attachment_id),
+            "/agencies/%s/proposals/%s/attachments/%s" % (self.agency_id, proposal_id, attachment_id),
             extra_headers
         )
         return js

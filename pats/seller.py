@@ -500,7 +500,29 @@ class PATSSeller(PATSAPIClient):
             "/vendors/%s/rfps/%s/proposals" % (self.vendor_id, rfp_id),
             extra_headers
         )
-        # TODO: Parse the response and return something more intelligible
+        return js
+
+    def get_rfp_attachment(self, agency_id=None, rfp_id=None, attachment_id=None):
+        """
+        Retrieve an attachment to an RFP based on its ID.
+        Broken, raised as PATS-953
+        """
+        if agency_id == None:
+            raise PATSException("Agency ID is required")
+        if rfp_id == None:
+            raise PATSException("RFP ID is required")
+        if attachment_id == None:
+            raise PATSException("Attachment ID is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.rfps-v3+json'
+        }
+
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            "/agencies/%s/rfps/%s/attachments/%s" % (agency_id, rfp_id, attachment_id),
+            extra_headers
+        )
         return js
 
     def send_proposal(self, rfp_id=None, proposal_external_id=None, comments=None, digital_line_items=None, print_line_items=None, attachments=None):
