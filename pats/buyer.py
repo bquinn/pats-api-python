@@ -168,7 +168,7 @@ class PATSBuyer(PATSAPIClient):
         js = self._send_request(
             "GET",
             AGENCY_API_DOMAIN,
-            "/agencies/%s/campaign/%s/rfps" % (self.agency_id, campaign_public_id),
+            "/agencies/%s/campaigns/%s/rfps" % (self.agency_id, campaign_public_id),
             extra_headers
         )
         return js
