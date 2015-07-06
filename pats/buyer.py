@@ -430,13 +430,13 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def view_orders(self, buyer_email=None, start_date=None, end_date=None):
+    def view_orders(self, user_id=None, start_date=None, end_date=None):
         """
         TODO - Mediaocean need to create an API for this!!
         """
         pass
 
-    def view_order_revisions(self, buyer_email=None, start_date=None, end_date=None):
+    def view_order_revisions(self, user_id=None, start_date=None, end_date=None):
         """
         As a buyer, view all order revisions sent to me.
         """
@@ -446,12 +446,12 @@ class PATSBuyer(PATSAPIClient):
             raise PATSException("Start date must be a Python date or datetime object")
         if not isinstance(end_date, datetime.datetime) and not (isinstance(end_date, datetime.date)):
             raise PATSException("If end date exists it must be a Python date or datetime object")
-        if buyer_email == None:
-            raise PATSException("Buyer email is required")
+        if user_id == None:
+            raise PATSException("User ID is required")
 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
-            'X-MO-User-Id': buyer_email
+            'X-MO-User-Id': user_id
         }
 
         path = '/agencies/%s/orders/revisions' % self.agency_id
@@ -470,21 +470,23 @@ class PATSBuyer(PATSAPIClient):
         # TODO: Parse the response and return something more intelligible
         return js
 
-    def view_order_detail(self, buyer_email=None, order_public_id=None):
+    def view_order_detail(self, user_id=None, order_id=None):
         """
         As a buyer, view the detail of one order.
         """
         # /agencies/{agency public id}/orders/{External Order Id}/revisions
-        if buyer_email == None:
-            raise PATSException("Buyer email is required")
+        if user_id == None:
+            raise PATSException("User ID is required")
+        if order_id == None:
+            raise PATSException("Order ID is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
-            'X-MO-User-Id': buyer_email
+            'X-MO-User-Id': user_id
         }
         js = self._send_request(
             "GET",
             AGENCY_API_DOMAIN,
-            "/agencies/%s/orders/%s/revisions" % (self.agency_id, order_public_id),
+            "/agencies/%s/orders/%s/revisions" % (self.agency_id, order_id),
             extra_headers
         )
         return js
@@ -517,12 +519,12 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
         
-    def return_order_revision(self, order_public_id, order_major_version, order_minor_version, buyer_email, seller_email, revision_due_date, comment):
+    def return_order_revision(self, order_public_id, order_major_version, order_minor_version, user_id, seller_email, revision_due_date, comment):
         # TODO: allow attachments
         # /agencies/{agency public id}/orders/{external public id}/revisions/return 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1.0+json',
-            'X-MO-User-ID': buyer_email
+            'X-MO-User-ID': user_id
         }
         data = {
             'majorVersion': order_major_version,

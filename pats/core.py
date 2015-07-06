@@ -181,7 +181,7 @@ class PATSAPIClient(object):
                 "Bad Request. The parameters you provided did not validate")
         elif error_code == 401:
             raise PATSException(
-                "%s Possibly invalid API key %s" % (reason, self.api_key))
+                "%s (Possibly invalid API key) %s" % (reason, self.api_key))
         elif error_code == 404:
             raise PATSException(
                 "Not found: %s" % reason)
@@ -378,6 +378,8 @@ class InsertionOrderLineItem(JSONSerializable):
         self.productId = kwargs.get('productId', '')
         self.buyCategory = kwargs.get('buyCategory', '')
         self.packageType = kwargs.get('packageType', '')
+        self.comments = kwargs.get('comments', '')
+        self.target = kwargs.get('target', '')
 
     def setOperation(self, operation):
         if operation not in self.possible_operations:
@@ -398,6 +400,8 @@ class InsertionOrderLineItem(JSONSerializable):
             "subsection": self.subsection,
             "subMediaType": self.subMediaType,
             "buyCategory": self.buyCategory,
+            "comments": self.comments,
+            "target": self.target,
         }
         if self.externalPlacementId:
             dict.update({

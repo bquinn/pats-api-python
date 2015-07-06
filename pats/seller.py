@@ -574,8 +574,8 @@ class PATSSeller(PATSAPIClient):
         # "{"validationResult":{"digitalLineItems":{"1":[{"message":"...","fieldName":"..."}],"2":[...]},"printLineItems":{"1":[{"message":"...","fieldName":"..."}],"2":[...]},"validationFailedDto":null}}"
         # a valid response is
         # {"validationResult":{"digitalLineItems":{},"printLineItems":{},"validationFailedDto":null}}
-        # although we have some bugs that make valid responses come back with weird errors
-        if 'validationResult' in js and js['validationResult']['digitalLineItems'] != None:
+        # hence this weird check - raised as a bug PATS-937
+        if 'validationResult' in js and (js['validationResult']['digitalLineItems'] != {} or js['validationResult']['printLineItems'] != {}):
             errorStr = "Create proposal failed:\n"
             for type in js['validationResult']:
                 errors = js['validationResult'][type]
