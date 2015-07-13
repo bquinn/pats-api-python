@@ -291,11 +291,15 @@ class PATSSeller(PATSAPIClient):
             'Accept': 'application/vnd.mediaocean.security-v1+json',
             'X-MO-User-ID': user_id
         }
-        path = '/agencies?agencyId=%s' % agency_id
+        path = '/agencies'
+        if agency_id or last_updated_date or name:
+            path += '?'
+        if agency_id:
+            path += 'agencyId=%s&' % agency_id 
         if last_updated_date:
-            path += "&lastUpdatedDate="+last_updated_date
+            path += "lastUpdatedDate=%s&" % last_updated_date
         if name:
-            path += "&name="+name
+            path += "name=%s" % name
         js = self._send_request(
             "GET",
             PUBLISHER_API_DOMAIN,
