@@ -328,7 +328,6 @@ class InsertionOrderDetails(JSONSerializable):
             "agencyBuyerFirstName": self.agency_buyer_first_name,
             "agencyBuyerLastName": self.agency_buyer_last_name,
             "agencyBuyerEmail": self.agency_buyer_email,
-            "orderNumber": self.order_number, 
             "recipientEmails": self.recipient_emails, # array of strings
             "termsAndConditions": self.terms_and_conditions, # array of "name" / "content" pairs
             "respondByDate": self.respond_by_date.strftime("%Y-%m-%d"), 
@@ -344,7 +343,7 @@ class InsertionOrderLineItem(JSONSerializable):
     lineItemExternalId = None # used in proposals apparently
     placementName = None # ":"Times Sport Banner",
     costMethod = None # "CPM",
-    unitAmount = None # "2000000",
+    rate = None # "15.0",
     plannedCost = None # "30000.00",
     unitType = None # "Impressions",
     section = None # "Sport",
@@ -362,24 +361,35 @@ class InsertionOrderLineItem(JSONSerializable):
 
     operation = 'Add'
 
+    def getvar(self, varname, default, args, kwargs):
+        """
+        Sometimes we're passed a kwargs string, sometimes a dict. This handles both
+        (but there is probably a nicer way to do this)
+        """
+        if args:
+            return args[0].get(varname, default)
+        if kwargs:
+            return kwargs.get(varname, default)
+
     def __init__(self, *args, **kwargs):
-        # we probably should generate this automatically? what happens to it as the order changes?
-        self.lineNumber = kwargs.get('lineNumber', '')
-        self.externalPlacementId = kwargs.get('externalPlacementId', '')
-        self.lineItemExternalId = kwargs.get('lineItemExternalId', '')
-        self.placementName = kwargs.get('placementName', '')
-        self.costMethod = kwargs.get('costMethod', '')
-        self.unitAmount = kwargs.get('unitAmount', '')
-        self.plannedCost = kwargs.get('plannedCost', '')
-        self.unitType = kwargs.get('unitType', '')
-        self.section = kwargs.get('section', '')
-        self.subsection = kwargs.get('subsection', '')
-        self.subMediaType = kwargs.get('subMediaType', '')
-        self.productId = kwargs.get('productId', '')
-        self.buyCategory = kwargs.get('buyCategory', '')
-        self.packageType = kwargs.get('packageType', '')
-        self.comments = kwargs.get('comments', '')
-        self.target = kwargs.get('target', '')
+        self.operation = self.getvar('operation', 'Add', args, kwargs)
+        self.lineNumber = self.getvar('lineNumber', '', args, kwargs)
+        self.externalPlacementId = self.getvar('externalPlacementId', '', args, kwargs)
+        self.lineItemExternalId = self.getvar('lineItemExternalId', '', args, kwargs)
+        self.placementName = self.getvar('placementName', '', args, kwargs)
+        self.costMethod = self.getvar('costMethod', '', args, kwargs)
+        self.unitType = self.getvar('unitType', '', args, kwargs)
+        self.plannedCost = self.getvar('plannedCost', '', args, kwargs)
+        self.costMethod = self.getvar('costMethod', '', args, kwargs)
+        self.buyCategory = self.getvar('buyCategory', '', args, kwargs)
+        self.rate = self.getvar('rate', '', args, kwargs)
+        self.section = self.getvar('section', '', args, kwargs)
+        self.subsection = self.getvar('subsection', '', args, kwargs)
+        self.comments = self.getvar('comments', '', args, kwargs)
+        self.packageType = self.getvar('packageType', 'Standalone', args, kwargs)
+        self.subMediaType = self.getvar('subMediaType', '', args, kwargs)
+        self.target = self.getvar('target', '', args, kwargs)
+        self.productId = self.getvar('productId', '', args, kwargs)
 
     def setOperation(self, operation):
         if operation not in self.possible_operations:
@@ -391,12 +401,14 @@ class InsertionOrderLineItem(JSONSerializable):
             "operation": self.operation,
             "lineNumber": self.lineNumber,
             "externalPlacementId": self.externalPlacementId,
+            "packageType": self.packageType,
             "placementName": self.placementName,
             "costMethod": self.costMethod,
-            "unitAmount": self.unitAmount,
+            "rate": self.rate,
             "plannedCost": self.plannedCost,
             "unitType": self.unitType,
             "section": self.section,
+            # fails for digital - PATS-522
             "subsection": self.subsection,
             "subMediaType": self.subMediaType,
             "buyCategory": self.buyCategory,
@@ -414,6 +426,14 @@ class InsertionOrderLineItem(JSONSerializable):
         if self.productId:
             dict.update({
                 "productId": self.productId
+            })
+        if hasattr(self, 'units'):
+            dict.update({
+                "units": self.units
+            })
+        if hasattr(self, 'unitAmount'):
+            dict.update({
+                "units": self.Amount
             })
         return dict
 
@@ -436,7 +456,7 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
     publication = None # "Time",
     # "printInsertion":{
     size = None # ":"25x4",
-    rate = None # "15.00",
+    # print has "units", digital has "unitAmount" for some reason
     units = 0
     color = None # ":"4CLR",
     colorName = None # ":"4 colour",
@@ -451,20 +471,21 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
 
     def __init__(self, *args, **kwargs):
         super(InsertionOrderLineItemPrint, self).__init__(*args, **kwargs)
-        self.publication = kwargs.get('publication', '')
-        self.size = kwargs.get('size', '')
-        self.color = kwargs.get('color', '')
-        self.units = kwargs.get('units', '')
-        self.rate = kwargs.get('rate', '')
-        self.printPosition = kwargs.get('printPosition', '')
-        self.positionName = kwargs.get('positionName', '')
-        self.isPositionGuaranteed = kwargs.get('isPositionGuaranteed', '')
-        self.includeInDigitalEdition = kwargs.get('includeInDigitalEdition', '')
-        self.coverDate = kwargs.get('coverDate', None)
-        self.saleDate = kwargs.get('saleDate', None)
-        self.copyDeadline = kwargs.get('copyDeadline', None)
-        self.sizeNumCols = kwargs.get('sizeNumCols', None)
-        self.sizeNumUnits = kwargs.get('sizeNumUnits', None)
+        self.publication = self.getvar('publication', '', args, kwargs)
+        self.size = self.getvar('size', '', args, kwargs)
+        self.color = self.getvar('color', '', args, kwargs)
+        self.units = self.getvar('units', '', args, kwargs)
+        self.printPosition = self.getvar('printPosition', '', args, kwargs)
+        self.region = self.getvar('region', '', args, kwargs)
+        self.publication = self.getvar('publication', '', args, kwargs)
+        self.isPositionGuaranteed = self.getvar('isPositionGuaranteed', '', args, kwargs)
+        self.includeInDigitalEdition = self.getvar('includeInDigitalEdition', '', args, kwargs)
+        self.coverDate = self.getvar('coverDate', '', args, kwargs)
+        self.saleDate = self.getvar('saleDate', '', args, kwargs)
+        self.sizeNumCols = self.getvar('sizeNumCols', '', args, kwargs)
+        self.sizeNumUnits = self.getvar('sizeNumUnits', '', args, kwargs)
+
+        # validation
         if self.buyCategory not in self.possible_buy_categories_print:
             raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
@@ -474,7 +495,6 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
                 "size": self.size,
                 "color": self.color,
                 "printPosition": self.printPosition,
-                "positionName": self.positionName,
                 "isPositionGuaranteed":self.isPositionGuaranteed,
                 "includeInDigitalEdition": self.includeInDigitalEdition
         }
@@ -501,9 +521,9 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
         dict.update({
             "operation": self.operation,
             "publication": self.publication,
-            # the parent class handles "unitAmount" but print has "units" differently
-            "rate": self.rate,
+            # digital has "unitAmount" but print has "units"
             "units": self.units,
+            "region": self.region,
             "printInsertion": printInsertion
         })
         return dict
@@ -520,13 +540,12 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
     ]
 
     site = None # ": "thetimes.co.uk" ,
-    rate = None # "15.00",
+    unitAmount = None # "2000000",
     flightStart = None # "2015-02-01",
     flightEnd = None # "2015-02-28",
     dimensions = None #  "468x60",
     dimensionsPosition = None #  "Above the Fold",
     servedBy = None # "3rd party",
-    bookingCategoryName = None # "Standard",
     # needs to be its own object probably
     flighting = None #":[
     #    { "startDate":"2015-02-01", "endDate":"2015-02-28", "unitAmount":"2000000", "plannedCost":"30000.00" }
@@ -534,15 +553,16 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
 
     def __init__(self, *args, **kwargs):
         super(InsertionOrderLineItemDigital, self).__init__(*args, **kwargs)
-        self.site = kwargs.get('site', '')
-        self.rate = kwargs.get('rate', '')
-        self.flightStart = kwargs.get('flightStart', '')
-        self.flightEnd = kwargs.get('flightEnd', '')
-        self.dimensions = kwargs.get('dimensions', '')
-        self.dimensionsPosition = kwargs.get('dimensionsPosition', '')
-        self.servedBy = kwargs.get('servedBy', '')
-        self.bookingCategoryName = kwargs.get('bookingCategoryName', '')
-        self.flighting = kwargs.get('flighting', [])
+        self.flightStart = self.getvar('flightStart', '', args, kwargs)
+        self.flightEnd = self.getvar('flightEnd', '', args, kwargs)
+        self.site = self.getvar('site', '', args, kwargs)
+        self.dimensions = self.getvar('dimensions', '', args, kwargs)
+        self.dimensionsPosition = self.getvar('dimensionsPosition', '', args, kwargs)
+        self.servedBy = self.getvar('servedBy', '', args, kwargs)
+        self.unitAmount = self.getvar('unitAmount', '', args, kwargs)
+        self.flighting = self.getvar('flighting', '', args, kwargs)
+
+        # validation
         if self.buyCategory not in self.possible_buy_categories_online:
             raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
@@ -553,10 +573,10 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
             "rate": self.rate,
             "flightStart": self.flightStart.strftime("%Y-%m-%d"),
             "flightEnd": self.flightEnd.strftime("%Y-%m-%d"),
+            "unitAmount": self.unitAmount,
             "dimensions": self.dimensions,
             "dimensionsPosition": self.dimensionsPosition,
             "servedBy": self.servedBy,
-            "bookingCategoryName": self.bookingCategoryName,
         })
         if self.flighting:
             flightingArray = []
