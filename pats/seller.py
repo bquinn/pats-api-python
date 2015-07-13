@@ -293,7 +293,7 @@ class PATSSeller(PATSAPIClient):
         }
         path = '/agencies?agencyId=%s' % agency_id
         if last_updated_date:
-            path += "&lastUpdatedDate="+last_updated_date.strftime("%Y-%m-%d")
+            path += "&lastUpdatedDate="+last_updated_date
         if name:
             path += "&name="+name
         js = self._send_request(
