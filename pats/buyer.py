@@ -35,6 +35,7 @@ import json
 import os
 import re
 import string
+import types
 from urllib import urlencode
 from .core import PATSAPIClient, PATSException, CampaignDetails, InsertionOrderDetails
 
@@ -173,7 +174,7 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def submit_rfp(self, sender_user_id=None, campaign_public_id=None, budget_amount=None, start_date=None, end_date=None, respond_by_date=None, comments="", publisher_id=None, publisher_emails=None, media_print=None, media_online=None, strategy=None, requested_products=None):
+    def submit_rfp(self, sender_user_id=None, campaign_public_id=None, budget_amount=None, budgets=None, start_date=None, end_date=None, respond_by_date=None, comments="", publisher_id=None, publisher_emails=None, publishers=None, media_print=None, media_online=None, strategy=None, requested_products=None):
         """
         Send an RFP to one or more publishers.
         Can optionally include product IDs.
@@ -190,25 +191,39 @@ class PATSBuyer(PATSAPIClient):
         data = {
             'agencyPublicId': self.agency_id,
             'campaignPublicId': campaign_public_id,
-            # the docs say "budgets" : { "amount" ... in "comma separated format"
-            # what they actually mean is "budgets": [ 1000, 2000, 3000 ]
-            'budgets': [ budget_amount ], # just handle one for now
             'startDate': start_date.strftime("%Y-%m-%d"),
             'endDate': end_date.strftime("%Y-%m-%d"),
             'responseDueDate': respond_by_date.strftime("%Y-%m-%d"),
             'comments': comments,
-            'publisherRecipients': [
-                {
-                    'publisherPublicId': publisher_id,
-                    'emails': publisher_emails,
-                }
-            ],
             'media': media,
             'strategy': strategy, # must be one of defined set of terms
             # TODO: handle attachments
         }
+        # user can supply "budget_amount" with one budget or "budgets" with a list
+        if budget_amount:
+            data.update({ 'budgets': [ budget_amount ] })
+        elif (budgets and type(budgets) is types.ListType):
+            data.update({'budgets': budgets})
+        else:
+            raise PATSException("Either budget_amount (single value) or budgets (list) is required")
+        # user can supply "publisher_id" and "publisher_emails" for one publisher, or "publishers"
+        # with a dict for multiple publishers
+        if publisher_id and publisher_emails:
+            data.update({
+                'publisherRecipients': [
+                    {
+                        'publisherPublicId': publisher_id,
+                        'emails': publisher_emails,
+                    }
+                ]
+            })
+        elif publishers:
+            data.update({
+                'publisherRecipients': publishers
+            })
+            
         if requested_products and requested_products != '':
-            data.update({ 'requestedProducts': requested_products })
+            data.update({'requestedProducts': requested_products })
         js = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,
