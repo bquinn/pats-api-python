@@ -418,7 +418,7 @@ class PATSSeller(PATSAPIClient):
             raise PATSException("Order ID is required")
         extra_headers = {}
         extra_headers.update({
-            'Accept': 'application/vnd.mediaocean.order-v1.0+json',
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
         })
 
         path = '/vendors/%s/orders/%s/revisions' % (vendor_id, order_id)
