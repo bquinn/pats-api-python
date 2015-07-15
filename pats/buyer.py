@@ -538,7 +538,7 @@ class PATSBuyer(PATSAPIClient):
         # TODO: allow attachments
         # /agencies/{agency public id}/orders/{external public id}/revisions/return 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1.0+json',
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
             'X-MO-User-ID': user_id
         }
         data = {
