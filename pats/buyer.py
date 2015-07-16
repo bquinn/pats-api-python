@@ -557,3 +557,28 @@ class PATSBuyer(PATSAPIClient):
             json.dumps(data)
         )
         return js
+
+    def request_order_revision(self, order_public_id=None, order_major_version=None, order_minor_version=None, user_id=None, seller_email=None, revision_due_date=None, comment=None):
+        # TODO: allow attachments
+        # /agencies/{agency public id}/orders/{External Order Id}/revisions/request
+        extra_headers = {
+            # might be 1.0 but I'm guessing that's another bug in the docs
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-User-ID': user_id
+        }
+        data = {
+            'majorVersion': order_major_version,
+            'minorVersion': order_minor_version,
+            'revisionDueBy': revision_due_date.strftime("%Y-%m-%d"),
+            'comment': comment,
+            'email': seller_email,
+            'orderAttachments': [], # leave it blank for now
+        }
+        js = self._send_request(
+            "POST",
+            AGENCY_API_DOMAIN,
+            "/agencies/%s/orders/%s/revisions/request" % (self.agency_id, order_public_id),
+            extra_headers,
+            json.dumps(data)
+        )
+        return js
