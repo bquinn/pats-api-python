@@ -30,6 +30,7 @@ Based on Mediaocean PATS API documented at https://developer.mediaocean.com/
 
 from collections import OrderedDict
 from httplib import HTTPSConnection
+import base64
 import datetime
 import json
 import os
@@ -174,7 +175,7 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def submit_rfp(self, sender_user_id=None, campaign_public_id=None, budget_amount=None, budgets=None, start_date=None, end_date=None, respond_by_date=None, comments="", publisher_id=None, publisher_emails=None, publishers=None, media_print=None, media_online=None, strategy=None, requested_products=None):
+    def submit_rfp(self, sender_user_id=None, campaign_public_id=None, budget_amount=None, budgets=None, start_date=None, end_date=None, respond_by_date=None, comments="", publisher_id=None, publisher_emails=None, publishers=None, media_print=None, media_online=None, strategy=None, requested_products=None, attachments=None):
         """
         Send an RFP to one or more publishers.
         Can optionally include product IDs.
@@ -196,8 +197,7 @@ class PATSBuyer(PATSAPIClient):
             'responseDueDate': respond_by_date.strftime("%Y-%m-%d"),
             'comments': comments,
             'media': media,
-            'strategy': strategy, # must be one of defined set of terms
-            # TODO: handle attachments
+            'strategy': strategy # must be one of defined set of terms
         }
         # user can supply "budget_amount" with one budget or "budgets" with a list
         if budget_amount:
@@ -224,6 +224,10 @@ class PATSBuyer(PATSAPIClient):
             
         if requested_products and requested_products != '':
             data.update({'requestedProducts': requested_products })
+        # handle attachments - expect an array containing dicts
+        # of { "fileName", "mimeType" and "contents" }
+        if attachments:
+            data.update({ 'attachments': attachments })
         js = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,
