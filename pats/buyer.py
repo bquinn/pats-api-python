@@ -42,8 +42,6 @@ from .core import PATSAPIClient, PATSException, CampaignDetails, InsertionOrderD
 
 AGENCY_API_DOMAIN = 'prisma-demo.api.mediaocean.com'
 
-VERSION = '0.1'
-
 class PATSBuyer(PATSAPIClient):
     agency_id = None
 
