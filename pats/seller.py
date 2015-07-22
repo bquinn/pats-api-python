@@ -675,4 +675,33 @@ class ProposalLineItemDigital(ProposalLineItem):
         return dict
 
 class ProposalLineItemPrint(ProposalLineItem):
-    pass
+    """
+    Until we can share one line item class between both orders and proposals...
+    """
+    publication = None
+    region = None
+    size = None
+    color = None
+    position = None
+    coverDate = None
+
+    def __init__(self, *args, **kwargs):
+        super(ProposalLineItemPrint, self).__init__(*args, **kwargs)
+        self.publication = kwargs.get('publication', '')
+        self.region = kwargs.get('region', '')
+        self.size = kwargs.get('size', '')
+        self.color = kwargs.get('color', '')
+        self.position = kwargs.get('position', '')
+        self.coverDate = kwargs.get('coverDate', '')
+
+    def dict_repr(self, *args, **kwargs):
+        dict = super(ProposalLineItemPrint, self).dict_repr(*args, **kwargs)
+        dict.update({
+            "publication":self.publication,
+            "region":self.region,
+            "size":self.size,
+            "color":self.color,
+            "position":self.position,
+            "coverDate":self.coverDate.strftime("%Y-%m-%d"),
+        })
+        return dict
