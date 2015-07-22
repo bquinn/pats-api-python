@@ -433,7 +433,7 @@ class InsertionOrderLineItem(JSONSerializable):
             })
         if hasattr(self, 'unitAmount'):
             dict.update({
-                "units": self.Amount
+                "units": self.unitAmount
             })
         return dict
 
