@@ -534,9 +534,11 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
         'Fee - Ad Serving', 'Fee - Ad Verification', 'Fee - Data', 'Fee - Mobile',
         'Fee - Privacy Icon', 'Fee - Production', 'Fee - Research', 'Fee - Search',
         'Fee - Sponsorship', 'Fee - Tax', 'Fee - Technology', 'Fee - Viewability',
-        'Fee – Other',
-        'Display Standard', 'Rich Media', 'Mobile', 'Video', 'Package','Roadblock',
-        'Interstitial','In-Game', 'Social', 'Sponsorship', 'Tablet', 'Text', 'Custom-Other'
+        'Fee - Other',
+        'Display Standard', 'Rich Media', 'Mobile', 'Video',
+        'Package','Roadblock', 'Interstitial','In-Game',
+        'Social', 'Sponsorship', 'Tablet', 'Text',
+        'Custom-Other'
     ]
 
     site = None # ": "thetimes.co.uk" ,
