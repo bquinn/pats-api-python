@@ -66,6 +66,7 @@ class PATSBuyer(PATSAPIClient):
     def get_sellers(self, user_id=None):
         """
         As a buyer, view all the sellers for which I have access to send orders.
+        http://developer.mediaocean.com/docs/read/organization_api/Get_seller_organization
         """
         if user_id == None:
             raise PATSException("User ID is required")
@@ -86,6 +87,7 @@ class PATSBuyer(PATSAPIClient):
     def get_buyers(self, user_id=None, agency_id=None, name=None, last_updated_date=None):
         """
         As a buyer user, list the details of all agencies I represent.
+        http://developer.mediaocean.com/docs/read/organization_api/Get_agency
         """
         if user_id == None:
             raise PATSException("User ID is required")
@@ -114,6 +116,7 @@ class PATSBuyer(PATSAPIClient):
         """
         As a buyer, view all the sellers to whom I can send orders at the
         given vendor.
+        http://developer.mediaocean.com/docs/read/organization_api/Get_user
         """
         if user_id == None:
             raise PATSException("User ID is required")
@@ -137,10 +140,12 @@ class PATSBuyer(PATSAPIClient):
         """
         Create an agency-side campaign, which is then used to send RFPs and orders.
         "campaign_details" must be a CampaignDetails instance.
+        http://developer.mediaocean.com/docs/read/prisma_integration_api/Create_campaign
         """
         if not isinstance(campaign_details, CampaignDetails):
             raise PATSException(
-                "The campaign_details parameter should be a CampaignDetails instance")
+                "The campaign_details parameter should be a CampaignDetails instance"
+            )
 
         # Create the http object
         extra_headers = {
@@ -159,8 +164,40 @@ class PATSBuyer(PATSAPIClient):
         # return full js object so we can parse errors
         return js
 
+    def update_campaign(self, campaign_id=None, campaign_details=None):
+        """
+        We can PUT to the same endpoint to update the record - an almost RESTful API!
+        http://developer.mediaocean.com/docs/read/prisma_integration_api/Create_campaign
+        """
+        if not isinstance(campaign_details, CampaignDetails):
+            raise PATSException(
+                "The campaign_details parameter should be a CampaignDetails instance"
+            )
+        if not campaign_id:
+            raise PATSException("campaign_id is required")
+        # Create the http object
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
+            'X-MO-Person-ID': campaign_details.person_id,
+            'X-MO-Company-ID': campaign_details.company_id,
+            'X-MO-Organization-ID': campaign_details.organisation_id
+        }
+        js = self._send_request(
+            "PUT",
+            AGENCY_API_DOMAIN,
+            "/campaigns/%s" % campaign_id,
+            extra_headers,
+            campaign_details.json_repr()
+        )
+        # return full js object so we can parse errors
+        return js
+
     def view_campaign_detail(self, sender_user_id, campaign_public_id):
-        # aka "view RFPs for campaign"
+        """
+        There's no specific API to view a campaign, so we have to use
+        "view RFPs for campaign"
+        http://developer.mediaocean.com/docs/read/rfp_api/Get_rfps_by_camp_publicid
+        """
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
             'X-MO-User-Id': sender_user_id
@@ -177,6 +214,7 @@ class PATSBuyer(PATSAPIClient):
         """
         Send an RFP to one or more publishers.
         Can optionally include product IDs.
+        http://developer.mediaocean.com/docs/read/rfp_api/Submit_rfp
         """
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
@@ -236,6 +274,10 @@ class PATSBuyer(PATSAPIClient):
         return js
 
     def view_rfp_detail(self, sender_user_id=None, rfp_id=None):
+        """
+        Get a single RFP using its public ID.
+        http://developer.mediaocean.com/docs/read/rfp_api/Get_rfp_by_publicid
+        """
         if rfp_id is None:
             raise PATSException("RFP ID is required")
         if sender_user_id is None:
@@ -255,6 +297,7 @@ class PATSBuyer(PATSAPIClient):
     def get_rfp_attachment(self, sender_user_id=None, rfp_id=None, attachment_id=None):
         """
         Get an attachment from an RFP.
+        http://developer.mediaocean.com/docs/read/rfp_api/Get_rfp_attachment_by_publicid
         """
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
@@ -269,6 +312,10 @@ class PATSBuyer(PATSAPIClient):
         return js
 
     def search_rfps(self, user_id=None, advertiser_name=None, campaign_urn=None, rfp_start_date=None,rfp_end_date=None,response_due_date=None,status=None):
+        """
+        Search for RFPs by advertiser name, campaign ID, RFP dates, response due date and/or status.
+        http://developer.mediaocean.com/docs/read/rfp_api/Search_for_rfps
+        """
         # /agencies/35-1-1W-1/rfps?advertiserName=Jaguar Land Rover&campaignUrn=someUrn&rfpStartDate=2014-08-10&rfpEndDate=2015-01-10&responseDueDate=2015-08-25&status=SENT
         if user_id is None:
             raise PATSException("User ID is required")
@@ -303,6 +350,7 @@ class PATSBuyer(PATSAPIClient):
     def get_proposal_attachment(self, sender_user_id=None, proposal_id=None, attachment_id=None):
         """
         Get contents of proposal attachment based on the proposal ID.
+        http://developer.mediaocean.com/docs/read/rfp_api/Get_proposal_attachment_by_publicid
         """
         if sender_user_id is None:
             raise PATSException("Sender-User-ID is required")
@@ -323,6 +371,10 @@ class PATSBuyer(PATSAPIClient):
         return js
 
     def return_proposal(self, sender_user_id=None, proposal_public_id=None, comments=None, due_date=None, emails=None, attachments=None):
+        """
+        "Return a proposal", which means "send a comment back to the seller that sent me this proposal"
+        http://developer.mediaocean.com/docs/read/rfp_api/Return_proposal
+        """
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
             'X-MO-User-Id': sender_user_id
@@ -356,6 +408,8 @@ class PATSBuyer(PATSAPIClient):
           you are requesting.
         - start_index (optional): First product to load (if doing paging)
         - max_results (optional):
+
+        http://developer.mediaocean.com/docs/read/catalog_api/List_catalog_products
         """
         if vendor_id is None:
             raise PATSException("Vendor ID is required")
@@ -394,6 +448,10 @@ class PATSBuyer(PATSAPIClient):
         person_id: (optional?) PATS ID of the person sending the order (different
             from the person named as the buyer contact in the order)
         insertion_order_details: info about the insertion order (must be an InsertionOrderDetails object)
+        line_items: object inserted as "line_items" in the order
+
+        http://developer.mediaocean.com/docs/read/orders_api/Create_online_order
+        http://developer.mediaocean.com/docs/read/orders_api/Create_print_order
         """
         # has default but can be overridden
         agency_id = kwargs.get('agency_id', self.agency_id)
@@ -427,6 +485,19 @@ class PATSBuyer(PATSAPIClient):
         return self.create_order_raw(agency_id=agency_id, company_id=company_id, person_id=person_id, data=data)
 
     def create_order_raw(self, agency_id=None, company_id=None, person_id=None, data=None):
+        """
+        create a print or digital order in PATS using a fully formed JSON payload
+        instead of Python objects.
+
+        agency_id: PATS ID of the buying agency (eg 35-IDSDKAD-7)
+        company_id: PATS ID of the buying company (eg PATS3)
+        person_id: (optional?) PATS ID of the person sending the order (different
+            from the person named as the buyer contact in the order)
+        data: full JSON payload - must contain campaign ID, insertion order details and all line items
+
+        http://developer.mediaocean.com/docs/read/orders_api/Create_online_order
+        http://developer.mediaocean.com/docs/read/orders_api/Create_print_order
+        """
         if agency_id==None:
             agency_id=self.agency_id # default but can be overridden
         extra_headers = {}
@@ -456,6 +527,7 @@ class PATSBuyer(PATSAPIClient):
     def view_order_revisions(self, user_id=None, start_date=None, end_date=None):
         """
         As a buyer, view all order revisions sent to me.
+        http://developer.mediaocean.com/docs/read/orders_api/Get_orders [sic]
         """
         if start_date == None:
             raise PATSException("Start date is required")
@@ -490,6 +562,8 @@ class PATSBuyer(PATSAPIClient):
     def view_order_detail(self, user_id=None, order_id=None):
         """
         As a buyer, view the detail of one order.
+
+        http://developer.mediaocean.com/docs/read/orders_api/Get_order_detail
         """
         # /agencies/{agency public id}/orders/{External Order Id}/revisions
         if user_id == None:
@@ -509,6 +583,11 @@ class PATSBuyer(PATSAPIClient):
         return js
 
     def view_order_status(self, person_id=None, company_id=None, campaign_id=None, order_id=None, version=None):
+        """
+        As a buyer, view the status of an order I have just sent.
+
+        http://developer.mediaocean.com/docs/read/orders_api/Get_order_status
+        """
         # /order/status/{externalCampaignId}/{orderId}/{version}
         if company_id == None:
             raise PATSException("Company ID is required")
@@ -537,6 +616,11 @@ class PATSBuyer(PATSAPIClient):
         return js
         
     def return_order_revision(self, order_public_id, order_major_version, order_minor_version, user_id, seller_email, revision_due_date, comment):
+        """
+        "Return order revision" which means "Send a message back to the person who sent this revision"
+
+        http://developer.mediaocean.com/docs/read/orders_api/Return_revision
+        """
         # TODO: allow attachments
         # /agencies/{agency public id}/orders/{external public id}/revisions/return 
         extra_headers = {
@@ -561,6 +645,10 @@ class PATSBuyer(PATSAPIClient):
         return js
 
     def request_order_revision(self, order_public_id=None, order_major_version=None, order_minor_version=None, user_id=None, seller_email=None, revision_due_date=None, comment=None):
+        """
+        "Request order revision" which means "Send a message to the person who received this order"
+        http://developer.mediaocean.com/docs/read/orders_api/Request_order_revision
+        """
         # TODO: allow attachments
         # /agencies/{agency public id}/orders/{External Order Id}/revisions/request
         extra_headers = {

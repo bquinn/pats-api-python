@@ -66,6 +66,9 @@ class PATSSeller(PATSAPIClient):
 
         Parameters:
         - data (required) : Payload of the product(s) you are updating.
+
+        http://developer.mediaocean.com/docs/read/catalog_api/Save_digital_products_to_catalog
+        http://developer.mediaocean.com/docs/read/catalog_api/Save_print_products_to_catalog
         """
         js = self._send_request(
             "POST",
@@ -281,6 +284,8 @@ class PATSSeller(PATSAPIClient):
         """
         As a seller, view detail about the specified agency.
         BROKEN - bug no PATS-880
+
+        http://developer.mediaocean.com/docs/read/organization_api/Get_agency
         """
         #if agency_id == None:
         #    raise PATSException("Agency ID is required")
@@ -313,6 +318,8 @@ class PATSSeller(PATSAPIClient):
         """
         As a seller, view detail about the specified agency.
         BROKEN - bug no PATS-880
+
+        http://developer.mediaocean.com/docs/read/organization_api/Get_agency
         """
         if agency_name == None:
             raise PATSException("Agency name string is required")
@@ -335,9 +342,9 @@ class PATSSeller(PATSAPIClient):
 
     def view_orders(self, start_date=None, end_date=None):
         """
-        As a seller, view all order revisions that I have created.
-        (Seems like an odd thing to want to do, this was supposed to be "view orders"
-        but that doesn't actually exist yet!)
+        As a seller, view all orders that are available to me.
+
+        http://developer.mediaocean.com/docs/read/publisher_orders_api/Publisher_list_order_summary
         """
         if start_date == None:
             raise PATSException("Start date is required")
@@ -364,7 +371,9 @@ class PATSSeller(PATSAPIClient):
 
     def view_order_detail(self, order_id=None, version=None):
         """
-        As a seller, view detail of an order version.
+        As a seller, view detail of a particular (major) version of an order.
+
+        http://developer.mediaocean.com/docs/read/publisher_orders_api/Get_order_detail_by_version
         """
         if order_id == None:
             raise PATSException("order ID is required")
@@ -384,7 +393,11 @@ class PATSSeller(PATSAPIClient):
 
     def view_order_history(self, order_id=None, full=False):
         """
-        As a seller, view the full history (ie all old versions) of an order.
+        As a seller, view the history (ie all old versions) of an order.
+
+        full (True/False): if True, returns the complete order history including all line items for each version.
+
+        http://developer.mediaocean.com/docs/read/publisher_orders_api/Publisher_get_order_history
         """
         if order_id == None:
             raise PATSException("order ID is required")
@@ -402,24 +415,69 @@ class PATSSeller(PATSAPIClient):
         )
         return js
         
-    def send_order_revision(self, order_id=None):
-        # TODO - docs being released on 9 March apparently...
+    def send_order_revision(self, order_id=None, user_id=None, comment=None, print_line_items=None, digital_line_items=None):
+        """
+        Send a revision (ie a proposed new version) of an order back to the buyer.
+        Must always be in response to a sent order.
+        order_id: order that is being revised ("public ID" eg O-KVG)
+        user_id: seller username who is sending the revision
+        print_line_items / digital_line_items (one only):
+            array of InsertionOrderLineItemPrint or InsertionOrderLineItemDigital objects.
+        """
         if order_id == None:
             raise PATSException("order ID is required")
-        extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json'
-        }
-        pass
 
-    def send_order_revision_raw(self, vendor_id=None, order_id=None, person_id=None, data=None):
+        data = {
+            'comment': comment
+        }
+        if print_line_items:
+            flattened_line_item_array = []
+            foreach print_item in print_line_items:
+                if not type(print_item) == InsertionOrderPrintLineItem:
+                    raise PATSException("each line item in array must be an instance of InsertionOrderPrintLineItem")
+                flattened_line_item_array.append(print_item.to_repr())
+            print_line_iems_flattened = ','.join(flattened_line_item_array)
+            data.update({
+                'printLineItems': print_line_items_flattened
+            })
+        if digital_line_items:
+            flattened_line_item_array = []
+            foreach digital_item in digital_line_items:
+                if not type(digital_item) == InsertionOrderDigitalLineItem:
+                    raise PATSException("each line item in array must be an instance of InsertionOrderDigitalLineItem")
+                flattened_line_item_array.append(digital_item.to_repr())
+            digital_line_iems_flattened = ','.join(flattened_line_item_array)
+            data.update({
+                'digitalLineItems': digital_line_items_flattened
+            })
+            data.update({
+                'digitalLineItems': digital_line_items
+            })
+        return self.send_order_revision_raw(order_id, user_id, data)
+
+    def send_order_revision_raw(self, vendor_id=None, order_id=None, user_id=None, data=None):
+        """
+        Send a revision (ie a proposed new version) of an order back to the buyer.
+        Must always be in response to a sent order.
+
+        Paramaters:
+        order_id: the order to which this revision is being sent (always the most recent version)
+        user_id (optional): the PATS username for the user sending the revision.
+        data: raw payload of order contents, including line items.
+
+        http://developer.mediaocean.com/docs/read/publisher_orders_api/Submit_order_revision
+        """
         if vendor_id==None:
             vendor_id=self.vendor_id # default but can be overridden
         if order_id == None:
             raise PATSException("Order ID is required")
-        extra_headers = {}
-        extra_headers.update({
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
-        })
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json'
+        }
+        if user_id:
+            extra_headers.update({
+                'X-MO-User-Id': user_id
+            })
 
         path = '/vendors/%s/orders/%s/revisions' % (vendor_id, order_id)
 
@@ -436,6 +494,8 @@ class PATSSeller(PATSAPIClient):
     def respond_to_order(self, user_id=None, order_id=None, status=None, comments=None):
         """
         As a seller, Accept or Reject an order from a buyer.
+
+        http://developer.mediaocean.com/docs/read/publisher_orders_api/Respond_to_Order
         """
         if user_id == None:
             raise PATSException("User ID (seller email) is required")
@@ -468,6 +528,8 @@ class PATSSeller(PATSAPIClient):
     def view_rfps(self, start_date=None, end_date=None):
         """
         As a seller, view all RFPs from buyers.
+
+        http://developer.mediaocean.com/docs/read/proposals_api/List_rfps_date_range
         """
         extra_headers = {
             # this will probably change to "rfps" soon to be consistent with other headers
@@ -490,6 +552,8 @@ class PATSSeller(PATSAPIClient):
     def view_proposals(self, rfp_id=None):
         """
         As a seller, show all existing proposals in response to a buyer's RFP.
+
+        http://developer.mediaocean.com/docs/read/proposals_api/List_proposals
         """
         if rfp_id == None:
             raise PATSException("RFP ID is required")
@@ -510,6 +574,8 @@ class PATSSeller(PATSAPIClient):
         """
         Retrieve an attachment to an RFP based on its ID.
         Broken, raised as PATS-953
+
+        http://developer.mediaocean.com/docs/read/rfp_api/Get_rfp_attachment_by_publicid
         """
         if agency_id == None:
             raise PATSException("Agency ID is required")
@@ -532,6 +598,8 @@ class PATSSeller(PATSAPIClient):
     def send_proposal(self, rfp_id=None, proposal_external_id=None, comments=None, digital_line_items=None, print_line_items=None, attachments=None):
         """
         As a seller, send a proposal in response to a buyer's RFP.
+
+        http://developer.mediaocean.com/docs/read/proposals_api/Send_proposal
         """
 
         digital_line_items_obj = []
@@ -560,6 +628,8 @@ class PATSSeller(PATSAPIClient):
         """
         As a seller, send a proposal in response to a buyer's RFP using a raw payload
         Used directly by API tester app.
+
+        http://developer.mediaocean.com/docs/read/proposals_api/Send_proposal
         """
         if vendor_id == None:
             raise PATSException("Vendor (aka publisher) ID is required")
