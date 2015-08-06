@@ -430,29 +430,21 @@ class PATSSeller(PATSAPIClient):
         data = {
             'comment': comment
         }
-        if print_line_items:
-            flattened_line_item_array = []
-            foreach print_item in print_line_items:
-                if not type(print_item) == InsertionOrderPrintLineItem:
-                    raise PATSException("each line item in array must be an instance of InsertionOrderPrintLineItem")
-                flattened_line_item_array.append(print_item.to_repr())
-            print_line_iems_flattened = ','.join(flattened_line_item_array)
-            data.update({
-                'printLineItems': print_line_items_flattened
-            })
+        digital_line_items_obj = []
         if digital_line_items:
-            flattened_line_item_array = []
-            foreach digital_item in digital_line_items:
-                if not type(digital_item) == InsertionOrderDigitalLineItem:
-                    raise PATSException("each line item in array must be an instance of InsertionOrderDigitalLineItem")
-                flattened_line_item_array.append(digital_item.to_repr())
-            digital_line_iems_flattened = ','.join(flattened_line_item_array)
+            for line_item in digital_line_items:
+                digital_line_items_obj.append(line_item.dict_repr())
             data.update({
-                'digitalLineItems': digital_line_items_flattened
+                "digitalLineItems": digital_line_items_obj
             })
+        print_line_items_obj = []
+        if print_line_items:
+            for line_item in print_line_items:
+                print_line_items_obj.append(line_item.dict_repr())
             data.update({
-                'digitalLineItems': digital_line_items
+                "printLineItems": print_line_items_obj
             })
+
         return self.send_order_revision_raw(order_id, user_id, data)
 
     def send_order_revision_raw(self, vendor_id=None, order_id=None, user_id=None, data=None):
