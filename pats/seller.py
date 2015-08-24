@@ -433,7 +433,7 @@ class PATSSeller(PATSAPIClient):
         digital_line_items_obj = []
         if digital_line_items:
             for line_item in digital_line_items:
-                digital_line_items_obj.append(line_item.dict_repr())
+                digital_line_items_obj.append(line_item.dict_repr(mode="seller"))
             data.update({
                 "digitalLineItems": digital_line_items_obj
             })
@@ -445,7 +445,7 @@ class PATSSeller(PATSAPIClient):
                 "printLineItems": print_line_items_obj
             })
 
-        return self.send_order_revision_raw(order_id, user_id, data)
+        return self.send_order_revision_raw(order_id=order_id, user_id=user_id, data=data)
 
     def send_order_revision_raw(self, vendor_id=None, order_id=None, user_id=None, data=None):
         """
@@ -653,117 +653,3 @@ class PATSSeller(PATSAPIClient):
                             errorStr += "    " + fielderror['fieldName'] + ": " + fielderror['message'] + "\n"
             raise PATSException(errorStr)
         return js
-
-class ProposalLineItem(JSONSerializable):
-    """
-    This shouldn't be necessary - proposal line items should be the same as order ones.
-    But for now this is necessary.
-    """
-    lineItemExternalId = None
-    productId = None
-    productName = None
-    section = None
-    subsection = None
-    units = None
-    subMediaType = None
-    unitType = None
-    rate = None
-    costMethod = None
-
-    def __init__(self, *args, **kwargs):
-        self.lineItemExternalId = kwargs.get('lineItemExternalId', '')
-        self.productId = kwargs.get('productId', '')
-        self.productName = kwargs.get('productName', '')
-        self.section = kwargs.get('section', '')
-        self.subsection = kwargs.get('subsection', '')
-        self.units = kwargs.get('units', '')
-        self.subMediaType = kwargs.get('subMediaType', '')
-        self.unitType = kwargs.get('unitType', '')
-        self.rate = kwargs.get('rate', '')
-        self.costMethod = kwargs.get('costMethod', '')
-
-    def dict_repr(self):
-        dict = {
-            # called "externalPlacementId" for orders
-            "lineItemExternalId":self.lineItemExternalId,
-            # same in orders
-            "productId":self.productId,
-            "productName": self.productName,
-            "section":self.section,
-            "subsection":self.subsection,
-            "units":self.units,
-            "subMediaType":self.subMediaType,
-            "unitType":self.unitType,
-            "rate":self.rate,
-            "costMethod":self.costMethod,
-        }
-        return dict
-
-class ProposalLineItemDigital(ProposalLineItem):
-    """
-    Again, this shouldn't be necessary - get rid of it ASAP!
-    """
-    site = None
-    buyCategory = None
-    dimensionsAndPosition = None
-    flightStart = None
-    flightEnd = None
-
-    # for validation
-    possible_buy_categories_online = [
-        'Display Standard', 'Rich Media', 'Mobile', 'Video', 'Package','Roadblock',
-        'Interstitial','In-Game', 'Social', 'Sponsorship', 'Tablet', 'Text', 'Custom-Other'
-    ]
-
-    def __init__(self, *args, **kwargs):
-        super(ProposalLineItemDigital, self).__init__(*args, **kwargs)
-        self.site = kwargs.get('site', '')
-        self.buyCategory = kwargs.get('buyCategory', '')
-        self.dimensionsAndPosition = kwargs.get('dimensionsAndPosition', '')
-        self.flightStart = kwargs.get('flightStart', '')
-        self.flightEnd = kwargs.get('flightEnd', '')
-        #if self.buyCategory not in self.possible_buy_categories_online:
-        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
-
-    def dict_repr(self, *args, **kwargs):
-        dict = super(ProposalLineItemDigital, self).dict_repr(*args, **kwargs)
-        dict.update({
-            "site":self.site,
-            "buyCategory":self.buyCategory,
-            "dimensionsAndPosition":self.dimensionsAndPosition,
-            "flightStart":self.flightStart.strftime("%Y-%m-%d"),
-            "flightEnd":self.flightEnd.strftime("%Y-%m-%d")
-        })
-        return dict
-
-class ProposalLineItemPrint(ProposalLineItem):
-    """
-    Until we can share one line item class between both orders and proposals...
-    """
-    publication = None
-    region = None
-    size = None
-    color = None
-    position = None
-    coverDate = None
-
-    def __init__(self, *args, **kwargs):
-        super(ProposalLineItemPrint, self).__init__(*args, **kwargs)
-        self.publication = kwargs.get('publication', '')
-        self.region = kwargs.get('region', '')
-        self.size = kwargs.get('size', '')
-        self.color = kwargs.get('color', '')
-        self.position = kwargs.get('position', '')
-        self.coverDate = kwargs.get('coverDate', '')
-
-    def dict_repr(self, *args, **kwargs):
-        dict = super(ProposalLineItemPrint, self).dict_repr(*args, **kwargs)
-        dict.update({
-            "publication":self.publication,
-            "region":self.region,
-            "size":self.size,
-            "color":self.color,
-            "position":self.position,
-            "coverDate":self.coverDate.strftime("%Y-%m-%d"),
-        })
-        return dict

@@ -63,6 +63,11 @@ class PATSAPIClient(object):
     def __init__(self, api_key, debug_mode=False, raw_mode=False, session=None):
         """
         Initialize a PATS instance.
+        Parameters:
+        api_key: key of PATS API user (buyer or seller as appropriate).
+        debug_mode: if True, output HTTP request and response.
+        raw_mode: store curl equivalent of each command, and the raw output, in user session if provided
+        session: handle to user session object which stores data in raw mode
         """
         self.api_key = api_key
         if debug_mode:
@@ -73,10 +78,11 @@ class PATSAPIClient(object):
             self.session = session
 
     def _get_headers(self, extra_headers):
-        # Set User-Agent
+        # Set user agent, API key and output type
+        content_type = 'application/json'
         headers = {
             'User-Agent': "PATS Python Library/%s" % VERSION,
-            'Content-Type': 'application/json',
+            'Content-Type': content_type,
             'X-MO-API-Key': self.api_key
         }
         headers.update(extra_headers)
@@ -351,7 +357,9 @@ class InsertionOrderLineItem(JSONSerializable):
     subMediaType = None #  "Display (Digital)",
     productId = None # "TIMESSPORTBANNER",
     buyCategory = None # "Standard",
+    buyType = None # "Display", only used in revisions
     packageType = None # "Standalone",
+    packageName = None # "MyCoolPackage",
 
     possible_operations = [
         'Add',
@@ -382,11 +390,13 @@ class InsertionOrderLineItem(JSONSerializable):
         self.plannedCost = self.getvar('plannedCost', '', args, kwargs)
         self.costMethod = self.getvar('costMethod', '', args, kwargs)
         self.buyCategory = self.getvar('buyCategory', '', args, kwargs)
+        self.buyType = self.getvar('buyType', '', args, kwargs)
         self.rate = self.getvar('rate', '', args, kwargs)
         self.section = self.getvar('section', '', args, kwargs)
         self.subsection = self.getvar('subsection', '', args, kwargs)
         self.comments = self.getvar('comments', '', args, kwargs)
         self.packageType = self.getvar('packageType', 'Standalone', args, kwargs)
+        self.packageName = self.getvar('packageName', '', args, kwargs)
         self.subMediaType = self.getvar('subMediaType', '', args, kwargs)
         self.target = self.getvar('target', '', args, kwargs)
         self.productId = self.getvar('productId', '', args, kwargs)
@@ -396,7 +406,7 @@ class InsertionOrderLineItem(JSONSerializable):
             raise PATSException('Operation %s should be one of %s' % (operation, ', '.join(self.possible_operations)))
         self.operation = operation
 
-    def dict_repr(self):
+    def dict_repr(self, mode="buyer"):
         dict = {
             "operation": self.operation,
             "lineNumber": self.lineNumber,
@@ -408,13 +418,37 @@ class InsertionOrderLineItem(JSONSerializable):
             "plannedCost": self.plannedCost,
             "unitType": self.unitType,
             "section": self.section,
-            # fails for digital - PATS-522
-            "subsection": self.subsection,
-            "subMediaType": self.subMediaType,
             "buyCategory": self.buyCategory,
             "comments": self.comments,
             "target": self.target,
         }
+        if mode == "buyer":
+            dict.update({
+                "placementName": self.placementName,
+                # fails for digital - PATS-522
+                "subsection": self.subsection,
+                "subMediaType": self.subMediaType
+            })
+        else:
+            # handle submediatype and subsection differently on seller side
+            customColumns = []
+            if self.subMediaType:
+                customColumns.append({
+                    "name": "SUBMEDIATYPE",
+                    "value": self.subMediaType
+                })
+            if self.subsection:
+                customColumns.append({
+                    "name": "SUBSECTION",
+                    "value": self.subsection
+                })
+            # for no good reason, on the seller side placementName is called "name"
+            dict.update({
+                "name": self.placementName,
+                # we also have a separate buyType in revision mode only
+                "buyType": self.buyType,
+                "customColumns": customColumns
+            })
         if self.externalPlacementId:
             dict.update({
                 "externalPlacementId": self.externalPlacementId
@@ -427,13 +461,9 @@ class InsertionOrderLineItem(JSONSerializable):
             dict.update({
                 "productId": self.productId
             })
-        if hasattr(self, 'units'):
+        if self.packageName:
             dict.update({
-                "units": self.units
-            })
-        if hasattr(self, 'unitAmount'):
-            dict.update({
-                "units": self.unitAmount
+                "packageName": self.packageName
             })
         return dict
 
@@ -489,8 +519,8 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
         if self.buyCategory not in self.possible_buy_categories_print:
             raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
-    def dict_repr(self, *args, **kwargs):
-        dict = super(InsertionOrderLineItemPrint, self).dict_repr(*args, **kwargs)
+    def dict_repr(self, mode="buyer"):
+        dict = super(InsertionOrderLineItemPrint, self).dict_repr(mode)
         printInsertion = {
                 "size": self.size,
                 "color": self.color,
@@ -518,11 +548,14 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
             printInsertion.update({
                 "sizeNumUnits": self.sizeNumUnits
             })
+        if self.units:
+            dict.update({
+                # digital has "unitAmount" but print has "units"
+                "units": self.units
+            })
         dict.update({
             "operation": self.operation,
             "publication": self.publication,
-            # digital has "unitAmount" but print has "units"
-            "units": self.units,
             "region": self.region,
             "printInsertion": printInsertion
         })
@@ -541,6 +574,7 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
         'Custom-Other'
     ]
 
+    lineItemId = None # only used in revisions
     site = None # ": "thetimes.co.uk" ,
     unitAmount = None # "2000000",
     flightStart = None # "2015-02-01",
@@ -548,6 +582,7 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
     dimensions = None #  "468x60",
     dimensionsPosition = None #  "Above the Fold",
     servedBy = None # "3rd party",
+    primaryPlacement = None # True/False
     # needs to be its own object probably
     flighting = None #":[
     #    { "startDate":"2015-02-01", "endDate":"2015-02-28", "unitAmount":"2000000", "plannedCost":"30000.00" }
@@ -555,6 +590,7 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
 
     def __init__(self, *args, **kwargs):
         super(InsertionOrderLineItemDigital, self).__init__(*args, **kwargs)
+        self.lineItemId = self.getvar('lineItemId', None, args, kwargs)
         self.flightStart = self.getvar('flightStart', '', args, kwargs)
         self.flightEnd = self.getvar('flightEnd', '', args, kwargs)
         self.site = self.getvar('site', '', args, kwargs)
@@ -563,23 +599,66 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
         self.servedBy = self.getvar('servedBy', '', args, kwargs)
         self.unitAmount = self.getvar('unitAmount', '', args, kwargs)
         self.flighting = self.getvar('flighting', '', args, kwargs)
+        self.primaryPlacement = self.getvar('primaryPlacement', None, args, kwargs)
 
         # validation
-        if self.buyCategory not in self.possible_buy_categories_online:
-            raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        #TEMPif self.buyCategory not in self.possible_buy_categories_online:
+        #TEMP    raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
-    def dict_repr(self):
-        dict = super(InsertionOrderLineItemDigital, self).dict_repr()
+    def dict_repr(self, mode="buyer"):
+        dict = super(InsertionOrderLineItemDigital, self).dict_repr(mode)
         dict.update({
             "site": self.site,
-            "rate": self.rate,
-            "flightStart": self.flightStart.strftime("%Y-%m-%d"),
-            "flightEnd": self.flightEnd.strftime("%Y-%m-%d"),
-            "unitAmount": self.unitAmount,
             "dimensions": self.dimensions,
             "dimensionsPosition": self.dimensionsPosition,
-            "servedBy": self.servedBy,
+            "servedBy": self.servedBy
         })
+        # lineItemId only exists for revisions
+        if mode == "seller" and self.lineItemId:
+            dict.update({
+                "lineItemId": self.lineItemId
+            })
+        # package children don't have dates, units or loads of other things
+        if self.flightStart:
+            dict.update({
+                "flightStart": self.flightStart.strftime("%Y-%m-%d"),
+            })
+        if self.flightEnd:
+            dict.update({
+                "flightEnd": self.flightEnd.strftime("%Y-%m-%d"),
+            })
+        if self.unitAmount:
+            dict.update({
+                "unitAmount": self.unitAmount,
+            })
+        if self.rate:
+            if mode == "buyer":
+                dict.update({
+                    "rate": self.rate,
+                })
+            else:
+                dict.update({
+                    "rate": {
+                        "amount": self.rate,
+                        "currencyCode": "GBP"
+                    }
+                })
+        if self.plannedCost:
+            if mode == "buyer":
+                dict.update({
+                    "plannedCost": self.plannedCost,
+                })
+            else:
+                dict.update({
+                    "cost": {
+                        "amount": self.plannedCost,
+                        "currencyCode": "GBP"
+                    }
+                })
+        if self.primaryPlacement:
+            dict.update({
+                "primaryPlacement": self.primaryPlacement,
+            })
         if self.flighting:
             flightingArray = []
             for flight in self.flighting:
@@ -594,4 +673,149 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
             dict.update({
                 "flighting": flightingArray
             })
+        return dict
+
+class ProposalLineItem(JSONSerializable):
+    """
+    This shouldn't be necessary - proposal line items should be the same as order ones.
+    But for now this is necessary.
+    """
+    lineItemExternalId = None
+    productId = None
+    productName = None
+    section = None
+    subsection = None
+    subMediaType = None
+    unitType = None
+    rate = None
+    units = None
+    costMethod = None
+    buyCategory = None
+    periods = []
+
+    def __init__(self, *args, **kwargs):
+        self.lineItemExternalId = kwargs.get('lineItemExternalId', '')
+        self.productId = kwargs.get('productId', '')
+        self.productName = kwargs.get('productName', '')
+        self.section = kwargs.get('section', '')
+        self.subsection = kwargs.get('subsection', '')
+        self.subMediaType = kwargs.get('subMediaType', '')
+        self.unitType = kwargs.get('unitType', '')
+        self.rate = kwargs.get('rate', '')
+        self.units = kwargs.get('units', '')
+        self.costMethod = kwargs.get('costMethod', '')
+        self.periods = kwargs.get('periods', [])
+
+    def dict_repr(self):
+        dict = {
+            # called "externalPlacementId" for orders
+            "lineItemExternalId":self.lineItemExternalId,
+            # same in orders
+            "productId":self.productId,
+            "productName": self.productName,
+            "section":self.section,
+            "subsection":self.subsection,
+            "subMediaType":self.subMediaType,
+            "unitType":self.unitType,
+            "rate":self.rate,
+            "units":self.units,
+            "costMethod":self.costMethod,
+        }
+        if self.periods:
+            dict.update({
+                "periods":self.periods
+            })
+        return dict
+
+    def getCost(self):
+        # the weird proposal line item definition doesn't have a cost field, just rate and units.
+        # so we have to calcuate it here to know what our value should be for testing purposes.
+        cost = 0
+        if self.costMethod == 'CPM':
+            cost = self.units * self.rate / 1000
+        elif self.costMethod == 'Flat':
+            cost = self.rate
+        else:
+            cost = self.units * self.rate
+        return cost
+
+class ProposalLineItemDigital(ProposalLineItem):
+    """
+    Again, this shouldn't be necessary - get rid of it ASAP!
+    """
+    site = None
+    dimensionsAndPosition = None
+    flightStart = None
+    flightEnd = None
+
+    # for validation
+    # see http://developer.mediaocean.com/docs/proposals_api/Proposals_API_reference_data#buy_categories
+    possible_buy_categories_online = [
+        'Standard', 'RichMedia', 'Mobile', 'Video',
+        'Interstitial','In-Game', 'Social', 'Sponsorship',
+        'Tablet', 'Text', 'Custom-Other'
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(ProposalLineItemDigital, self).__init__(*args, **kwargs)
+        self.site = kwargs.get('site', '')
+        self.buyCategory = kwargs.get('buyCategory', '')
+        self.dimensionsAndPosition = kwargs.get('dimensionsAndPosition', '')
+        self.flightStart = kwargs.get('flightStart', '')
+        self.flightEnd = kwargs.get('flightEnd', '')
+        if self.buyCategory not in self.possible_buy_categories_online:
+            raise PATSException("Buy Category %s not valid." % self.buyCategory)
+
+    def dict_repr(self, *args, **kwargs):
+        dict = super(ProposalLineItemDigital, self).dict_repr(*args, **kwargs)
+        dict.update({
+            "site":self.site,
+            "buyCategory":self.buyCategory,
+            "dimensionsAndPosition":self.dimensionsAndPosition,
+            "flightStart":self.flightStart.strftime("%Y-%m-%d"),
+            "flightEnd":self.flightEnd.strftime("%Y-%m-%d")
+        })
+        return dict
+
+class ProposalLineItemPrint(ProposalLineItem):
+    """
+    Until we can share one line item class between both orders and proposals...
+    """
+    publication = None
+    region = None
+    size = None
+    color = None
+    position = None
+    coverDate = None
+
+    # for validation
+    possible_buy_categories_print = [
+        'Standard', 'RichMedia', 'Mobile', 'Video',
+        'Interstitial','In-Game', 'Social', 'Sponsorship',
+        'Tablet', 'Text', 'Custom-Other'
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super(ProposalLineItemPrint, self).__init__(*args, **kwargs)
+        self.publication = kwargs.get('publication', '')
+        self.buyCategory = kwargs.get('buyCategory', '')
+        self.region = kwargs.get('region', '')
+        self.size = kwargs.get('size', '')
+        self.color = kwargs.get('color', '')
+        self.position = kwargs.get('position', '')
+        self.coverDate = kwargs.get('coverDate', '')
+        #if self.buyCategory not in self.possible_buy_categories_print:
+        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
+
+    def dict_repr(self, *args, **kwargs):
+        dict = super(ProposalLineItemPrint, self).dict_repr(*args, **kwargs)
+        dict.update({
+            "publication":self.publication,
+            "buyCategory":self.buyCategory,
+            "region":self.region,
+            "size":self.size,
+            "color":self.color,
+            "position":self.position,
+            "coverDate":self.coverDate.strftime("%Y-%m-%d"),
+        })
         return dict

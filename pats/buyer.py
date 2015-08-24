@@ -384,7 +384,7 @@ class PATSBuyer(PATSAPIClient):
         data = {
             'comments': comments,
             'dueDate': due_date.strftime("%Y-%m-%d"),
-            'emails': emails,
+            'emails': emails
         }
         if attachments:
             data.update({
