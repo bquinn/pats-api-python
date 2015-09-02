@@ -48,7 +48,7 @@ class PATSAPIClient(object):
     possible_media_subtypes_print = ['DISPLAY_PRINT', 'CLASSIFIED', 'INSERTS', 'PRINT_CUSTOM']
     possible_media_subtypes_digital = ['DISPLAY_DIGITAL', 'VIDEO', 'MOBILE', 'TABLET', 'APP']
     # "old" values pre April 2015
-    possible_categories = ['ARTS_AND_ENTERTAINMENT','AUTOMOTIVE','BUSINESS','CAREERS','EDUCATION','FAMILY_AND_PARENTING','HEALTH_AND_FITNESS','FOOD_AND_DRINK','HOBBIES_AND_INTERESTS','HOME_AND_GARDEN','LAW_GOVERNMENT_AND_POLITICS','NEWS','PERSONAL_FINANCE','SOCIETY','SCIENCE','PETS','SPORTS','STYLE_AND_FASHION','TECHNOLOGY_AND_COMPUTING','TRAVEL','REAL_ESTATE','SHOPPING','RELIGION_AND_SPIRITUALITY','SOCIAL_MEDIA']
+    # possible_categories = ['ARTS_AND_ENTERTAINMENT','AUTOMOTIVE','BUSINESS','CAREERS','EDUCATION','FAMILY_AND_PARENTING','HEALTH_AND_FITNESS','FOOD_AND_DRINK','HOBBIES_AND_INTERESTS','HOME_AND_GARDEN','LAW_GOVERNMENT_AND_POLITICS','NEWS','PERSONAL_FINANCE','SOCIETY','SCIENCE','PETS','SPORTS','STYLE_AND_FASHION','TECHNOLOGY_AND_COMPUTING','TRAVEL','REAL_ESTATE','SHOPPING','RELIGION_AND_SPIRITUALITY','SOCIAL_MEDIA']
     # "new" values sent by Jon on 8 April 2015
     possible_categories = ['ARTS_AND_ENTERTAINMENT','BEAUTY_AND_FITNESS','BOOKS_AND_LITERATURE','BUSINESS_AND_INDUSTRIAL','COMPUTERS_AND_ELECTRONICS','FINANCE','FOOD_AND_DRINK','GAMES','HEALTH','HOBBIES_AND_LEISURE','HOME_AND_GARDEN','INTERNET_AND_TELECOM','JOBS_AND_EDUCATION','LAW_GOVT_AND_POLITICS_NEWS','ONLINE_COMMUNITIES','PEOPLE_AND_SOCIETY','PETS_AND_ANIMALS','REAL_ESTATE','REFERENCE','SCIENCE','SHOPPING','SPORTS','TRAVEL']
     # debugging mode flag
@@ -92,13 +92,14 @@ class PATSAPIClient(object):
         # Create the http object
         h = HTTPSConnection(domain)
 
-        # uncomment this when things just aren't working...
         if self.debug_mode:
             h.set_debuglevel(10)
 
         # Construct the request headers
         headers = self._get_headers(extra_headers)
 
+        # In "raw mode", create the equivalent curl(1) command for this request
+        # and save it in the session provided in the constructor
         curl = ''
         if self.raw_mode and self.session:
             curl = 'curl -v -X "%s" ' % method
@@ -137,7 +138,7 @@ class PATSAPIClient(object):
         # 422 is "unprocessable entity" but more details are given in the JS response
         # so we should use that instead
         if response_status != 200 and response_status != 422:
-            self._relay_error(response_status, response.reason)
+            self._relay_error(response_status, response.reason + " " + response_text)
 
         js = None
         if response_text == '':
@@ -408,14 +409,12 @@ class InsertionOrderLineItem(JSONSerializable):
 
     def dict_repr(self, mode="buyer"):
         dict = {
-            "operation": self.operation,
             "lineNumber": self.lineNumber,
             "externalPlacementId": self.externalPlacementId,
             "packageType": self.packageType,
-            "placementName": self.placementName,
             "costMethod": self.costMethod,
-            "rate": self.rate,
-            "plannedCost": self.plannedCost,
+            "rate": "{0:.2f}".format(self.rate),
+            "plannedCost": "{0:.2f}".format(self.plannedCost),
             "unitType": self.unitType,
             "section": self.section,
             "buyCategory": self.buyCategory,
@@ -424,6 +423,7 @@ class InsertionOrderLineItem(JSONSerializable):
         }
         if mode == "buyer":
             dict.update({
+                "operation": self.operation,
                 "placementName": self.placementName,
                 # fails for digital - PATS-522
                 "subsection": self.subsection,
@@ -553,8 +553,10 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
                 # digital has "unitAmount" but print has "units"
                 "units": self.units
             })
+            dict.update({
+                "operation": self.operation,
+            })
         dict.update({
-            "operation": self.operation,
             "publication": self.publication,
             "region": self.region,
             "printInsertion": printInsertion
@@ -634,24 +636,24 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
         if self.rate:
             if mode == "buyer":
                 dict.update({
-                    "rate": self.rate,
+                    "rate": "{0:.2f}".format(self.rate),
                 })
             else:
                 dict.update({
                     "rate": {
-                        "amount": self.rate,
+                        "amount": "{0:.2f}".format(self.rate),
                         "currencyCode": "GBP"
                     }
                 })
         if self.plannedCost:
             if mode == "buyer":
                 dict.update({
-                    "plannedCost": self.plannedCost,
+                    "plannedCost": "{0:.2f}".format(self.plannedCost),
                 })
             else:
                 dict.update({
                     "cost": {
-                        "amount": self.plannedCost,
+                        "amount": "{0:.2f}".format(self.plannedCost),
                         "currencyCode": "GBP"
                     }
                 })
@@ -667,7 +669,7 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
                         "startDate":flight['startDate'].strftime("%Y-%m-%d"),
                         "endDate":flight['endDate'].strftime("%Y-%m-%d"),
                         "unitAmount":flight['unitAmount'],
-                        "plannedCost":flight['plannedCost']
+                        "plannedCost":"{0:.2f}".format(flight['plannedCost'])
                       }
                 )
             dict.update({
@@ -717,7 +719,7 @@ class ProposalLineItem(JSONSerializable):
             "subsection":self.subsection,
             "subMediaType":self.subMediaType,
             "unitType":self.unitType,
-            "rate":self.rate,
+            "rate":"{0:.2f}".format(self.rate),
             "units":self.units,
             "costMethod":self.costMethod,
         }

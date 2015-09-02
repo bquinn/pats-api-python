@@ -500,13 +500,15 @@ class PATSBuyer(PATSAPIClient):
         """
         if agency_id==None:
             agency_id=self.agency_id # default but can be overridden
-        extra_headers = {}
-        extra_headers.update({
+        extra_headers = {
             'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
             'X-MO-Company-ID': company_id,
-            'X-MO-Person-ID': person_id,
             'X-MO-Organization-ID': agency_id
-        })
+        }
+        if person_id:
+            extra_headers.update({
+                'X-MO-Person-ID': person_id
+            })
 
         # send request
         js = self._send_request(
