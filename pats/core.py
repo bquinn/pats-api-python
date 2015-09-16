@@ -388,11 +388,11 @@ class InsertionOrderLineItem(JSONSerializable):
         self.placementName = self.getvar('placementName', '', args, kwargs)
         self.costMethod = self.getvar('costMethod', '', args, kwargs)
         self.unitType = self.getvar('unitType', '', args, kwargs)
-        self.plannedCost = self.getvar('plannedCost', '', args, kwargs)
+        self.plannedCost = self.getvar('plannedCost', None, args, kwargs)
         self.costMethod = self.getvar('costMethod', '', args, kwargs)
         self.buyCategory = self.getvar('buyCategory', '', args, kwargs)
         self.buyType = self.getvar('buyType', '', args, kwargs)
-        self.rate = self.getvar('rate', '', args, kwargs)
+        self.rate = self.getvar('rate', None, args, kwargs)
         self.section = self.getvar('section', '', args, kwargs)
         self.subsection = self.getvar('subsection', '', args, kwargs)
         self.comments = self.getvar('comments', '', args, kwargs)
@@ -413,14 +413,24 @@ class InsertionOrderLineItem(JSONSerializable):
             "externalPlacementId": self.externalPlacementId,
             "packageType": self.packageType,
             "costMethod": self.costMethod,
-            "rate": "{0:.2f}".format(self.rate),
-            "plannedCost": "{0:.2f}".format(self.plannedCost),
             "unitType": self.unitType,
             "section": self.section,
             "buyCategory": self.buyCategory,
             "comments": self.comments,
             "target": self.target,
         }
+        if self.rate != None:
+            dict.update({
+                "rate": "{0:.4f}".format(self.rate)
+            })
+        if self.plannedCost != None:
+            dict.update({
+                "plannedCost": "{0:.2f}".format(self.plannedCost)
+            })
+        else:
+            dict.update({
+                "plannedCost": ""
+            })
         if mode == "buyer":
             dict.update({
                 "operation": self.operation,
@@ -565,16 +575,24 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
 
 class InsertionOrderLineItemDigital(InsertionOrderLineItem):
     # for validation
+    # see http://developer.mediaocean.com/docs/read/publisher_orders_api/Order_API_seller_reference_data
     possible_buy_categories_online = [
         'Fee - Ad Serving', 'Fee - Ad Verification', 'Fee - Data', 'Fee - Mobile',
         'Fee - Privacy Icon', 'Fee - Production', 'Fee - Research', 'Fee - Search',
         'Fee - Sponsorship', 'Fee - Tax', 'Fee - Technology', 'Fee - Viewability',
         'Fee - Other',
-        'Display Standard', 'Rich Media', 'Mobile', 'Video',
+        # confusion - buyer-side has "Display" and seller side has "Display Standard"
+        # among other differences...
+        'Display', 'Display Standard', 'Rich Media', 'Mobile', 'Video',
         'Package','Roadblock', 'Interstitial','In-Game',
         'Social', 'Sponsorship', 'Tablet', 'Text',
         'Custom-Other'
     ]
+    #possible_servedby = [
+    #    'Site',
+    #    '3rd party',
+    #    'Other'
+    #]
 
     lineItemId = None # only used in revisions
     site = None # ": "thetimes.co.uk" ,
@@ -604,8 +622,10 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
         self.primaryPlacement = self.getvar('primaryPlacement', None, args, kwargs)
 
         # validation
-        #TEMPif self.buyCategory not in self.possible_buy_categories_online:
-        #TEMP    raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        #if self.servedBy not in self.possible_servedby:
+        #    raise PATSException("servedBy %s not valid." % self.servedBy)
+        if self.buyCategory not in self.possible_buy_categories_online:
+            raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
     def dict_repr(self, mode="buyer"):
         dict = super(InsertionOrderLineItemDigital, self).dict_repr(mode)
@@ -636,12 +656,12 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
         if self.rate:
             if mode == "buyer":
                 dict.update({
-                    "rate": "{0:.2f}".format(self.rate),
+                    "rate": "{0:.4f}".format(self.rate),
                 })
             else:
                 dict.update({
                     "rate": {
-                        "amount": "{0:.2f}".format(self.rate),
+                        "amount": "{0:.4f}".format(self.rate),
                         "currencyCode": "GBP"
                     }
                 })
@@ -719,7 +739,7 @@ class ProposalLineItem(JSONSerializable):
             "subsection":self.subsection,
             "subMediaType":self.subMediaType,
             "unitType":self.unitType,
-            "rate":"{0:.2f}".format(self.rate),
+            "rate":"{0:.4f}".format(self.rate),
             "units":self.units,
             "costMethod":self.costMethod,
         }
@@ -749,13 +769,19 @@ class ProposalLineItemDigital(ProposalLineItem):
     dimensionsAndPosition = None
     flightStart = None
     flightEnd = None
+    servedBy = None
 
     # for validation
     # see http://developer.mediaocean.com/docs/proposals_api/Proposals_API_reference_data#buy_categories
     possible_buy_categories_online = [
-        'Standard', 'RichMedia', 'Mobile', 'Video',
+        'Display', 'RichMedia', 'Mobile', 'Video',
         'Interstitial','In-Game', 'Social', 'Sponsorship',
         'Tablet', 'Text', 'Custom-Other'
+    ]
+    possible_servedby = [
+        'Site',
+        '3rd party',
+        'Other'
     ]
 
     def __init__(self, *args, **kwargs):
@@ -765,8 +791,11 @@ class ProposalLineItemDigital(ProposalLineItem):
         self.dimensionsAndPosition = kwargs.get('dimensionsAndPosition', '')
         self.flightStart = kwargs.get('flightStart', '')
         self.flightEnd = kwargs.get('flightEnd', '')
+        self.servedBy = kwargs.get('servedBy', '')
         if self.buyCategory not in self.possible_buy_categories_online:
             raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        if self.servedBy not in self.possible_servedby:
+            raise PATSException("servedBy %s not valid." % self.servedBy)
 
     def dict_repr(self, *args, **kwargs):
         dict = super(ProposalLineItemDigital, self).dict_repr(*args, **kwargs)
@@ -774,6 +803,7 @@ class ProposalLineItemDigital(ProposalLineItem):
             "site":self.site,
             "buyCategory":self.buyCategory,
             "dimensionsAndPosition":self.dimensionsAndPosition,
+            "servedBy":self.servedBy,
             "flightStart":self.flightStart.strftime("%Y-%m-%d"),
             "flightEnd":self.flightEnd.strftime("%Y-%m-%d")
         })
@@ -791,11 +821,13 @@ class ProposalLineItemPrint(ProposalLineItem):
     coverDate = None
 
     # for validation
-    possible_buy_categories_print = [
-        'Standard', 'RichMedia', 'Mobile', 'Video',
-        'Interstitial','In-Game', 'Social', 'Sponsorship',
-        'Tablet', 'Text', 'Custom-Other'
-    ]
+    # should be in http://developer.mediaocean.com/docs/read/proposals_api/Proposals_API_reference_data
+    # but they're not listed... raised as PATS-1035.
+    #possible_buy_categories_print = [
+    #    'Standard', 'RichMedia', 'Mobile', 'Video',
+    #    'Interstitial','In-Game', 'Social', 'Sponsorship',
+    #    'Tablet', 'Text', 'Custom-Other'
+    #]
 
     def __init__(self, *args, **kwargs):
         super(ProposalLineItemPrint, self).__init__(*args, **kwargs)
