@@ -37,7 +37,7 @@ import re
 import string
 from urllib import urlencode
 
-VERSION = '0.4'
+VERSION = '0.5'
 
 class PATSException(Exception):
     pass

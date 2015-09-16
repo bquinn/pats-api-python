@@ -391,6 +391,52 @@ class PATSSeller(PATSAPIClient):
         # TODO: Parse the response and return something more intelligible
         return js
 
+    def view_revision_status_summary(self, user_id=None, order_id=None):
+        """
+        http://developer.mediaocean.com/docs/publisher_orders_api/Revision_status_summary
+        """
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json'
+        }
+        if user_id:
+            extra_headers.update({
+                'X-MO-User-Id': user_id
+            })
+
+        path = '/vendors/%s/orders/%s/revisionstatus' % (self.vendor_id, order_id)
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        return js
+
+    def view_revision_status_detail(self, user_id=None, order_id=None, order_version=None, revision_version=None):
+        """
+        http://developer.mediaocean.com/docs/publisher_orders_api/Revision_status_detail
+        """
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json'
+        }
+        if user_id:
+            extra_headers.update({
+                'X-MO-User-Id': user_id
+            })
+
+        path = '/vendors/%s/orders/%s/revisionstatus/detail?' % (self.vendor_id, order_id)
+        if order_version:
+            path += "orderVersion=%s" % order_version
+        if revision_version:
+            path += "&revisionVersion=%s" % revision_version
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        return js
+
     def view_order_history(self, order_id=None, full=False):
         """
         As a seller, view the history (ie all old versions) of an order.
