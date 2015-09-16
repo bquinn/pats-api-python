@@ -150,10 +150,14 @@ class PATSBuyer(PATSAPIClient):
         # Create the http object
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
-            'X-MO-Person-ID': campaign_details.person_id,
             'X-MO-Company-ID': campaign_details.company_id,
             'X-MO-Organization-ID': campaign_details.organisation_id
         }
+        # person_id is supposed to be optional - currently it fails without it though - PATS-1013
+        if campaign_details.person_id:
+            extra_headers.update({
+                'X-MO-Person-ID': campaign_details.person_id,
+            })
         js = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,
