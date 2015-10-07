@@ -361,13 +361,14 @@ class InsertionOrderLineItem(JSONSerializable):
     buyType = None # "Display", only used in revisions
     packageType = None # "Standalone",
     packageName = None # "MyCoolPackage",
+    supplierPlacementParentReference = None # to group items together across orders (eg AccessOne)
+    supplierPlacementReference = None # to keep publisher reference attached to a line item
 
     possible_operations = [
         'Add',
         'Update',
         'Delete'
     ]
-
     operation = 'Add'
 
     def getvar(self, varname, default, args, kwargs):
@@ -401,6 +402,8 @@ class InsertionOrderLineItem(JSONSerializable):
         self.subMediaType = self.getvar('subMediaType', '', args, kwargs)
         self.target = self.getvar('target', '', args, kwargs)
         self.productId = self.getvar('productId', '', args, kwargs)
+        self.supplierPlacementParentReference = self.getvar('supplierPlacementParentReference', None, args, kwargs)
+        self.supplierPlacementReference = self.getvar('supplierPlacementReference', None, args, kwargs)
 
     def setOperation(self, operation):
         if operation not in self.possible_operations:
@@ -419,6 +422,14 @@ class InsertionOrderLineItem(JSONSerializable):
             "comments": self.comments,
             "target": self.target,
         }
+        if self.supplierPlacementParentReference != None:
+            dict.update({
+                "supplierPlacementParentReference": self.supplierPlacementParentReference
+            })
+        if self.supplierPlacementReference != None:
+            dict.update({
+            "supplierPlacementReference": self.supplierPlacementReference
+            })
         if self.rate != None:
             dict.update({
                 "rate": "{0:.4f}".format(self.rate)
@@ -654,17 +665,20 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
                 "unitAmount": self.unitAmount,
             })
         if self.rate:
-            if mode == "buyer":
-                dict.update({
-                    "rate": "{0:.4f}".format(self.rate),
-                })
-            else:
-                dict.update({
-                    "rate": {
-                        "amount": "{0:.4f}".format(self.rate),
-                        "currencyCode": "GBP"
-                    }
-                })
+            dict.update({
+                "rate": "{0:.4f}".format(self.rate),
+            })
+            #if mode == "buyer":
+            #    dict.update({
+            #        "rate": "{0:.4f}".format(self.rate),
+            #    })
+            #else:
+            #    dict.update({
+            #        "rate": {
+            #            "amount": "{0:.4f}".format(self.rate),
+            #            "currencyCode": "GBP"
+            #        }
+            #    })
         if self.plannedCost:
             if mode == "buyer":
                 dict.update({
@@ -672,10 +686,12 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
                 })
             else:
                 dict.update({
-                    "cost": {
-                        "amount": "{0:.2f}".format(self.plannedCost),
-                        "currencyCode": "GBP"
-                    }
+                    "cost": "{0:.2f}".format(self.plannedCost),
+                #    "cost": {
+                #        "amount": "{0:.2f}".format(self.plannedCost),
+                #        "amount": "{0:.2f}".format(self.plannedCost),
+                #        "currencyCode": "GBP"
+                #    }
                 })
         if self.primaryPlacement:
             dict.update({
@@ -792,10 +808,10 @@ class ProposalLineItemDigital(ProposalLineItem):
         self.flightStart = kwargs.get('flightStart', '')
         self.flightEnd = kwargs.get('flightEnd', '')
         self.servedBy = kwargs.get('servedBy', '')
-        if self.buyCategory not in self.possible_buy_categories_online:
-            raise PATSException("Buy Category %s not valid." % self.buyCategory)
-        if self.servedBy not in self.possible_servedby:
-            raise PATSException("servedBy %s not valid." % self.servedBy)
+        #if self.buyCategory not in self.possible_buy_categories_online:
+        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        #if self.servedBy not in self.possible_servedby:
+        #    raise PATSException("servedBy %s not valid." % self.servedBy)
 
     def dict_repr(self, *args, **kwargs):
         dict = super(ProposalLineItemDigital, self).dict_repr(*args, **kwargs)
