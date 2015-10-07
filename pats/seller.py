@@ -514,7 +514,9 @@ class PATSSeller(PATSAPIClient):
         }
         if user_id:
             extra_headers.update({
-                'X-MO-User-Id': user_id
+                'X-MO-User-Id': user_id,
+                # This is supposed to be optional but it fails if not provided
+                'X-MO-Brand': 'pats'
             })
 
         path = '/vendors/%s/orders/%s/revisions' % (vendor_id, order_id)
