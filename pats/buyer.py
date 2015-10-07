@@ -480,7 +480,8 @@ class PATSBuyer(PATSAPIClient):
         if kwargs.get('line_items'):
             line_items = []
             for line_item in kwargs['line_items']:
-                line_item.setOperation('Add')
+                if not line_item.operation:
+                    line_item.setOperation('Add')
                 line_items.append(line_item.dict_repr())
             data.update({
                 'lineItems':line_items
