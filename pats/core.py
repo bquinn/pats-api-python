@@ -148,7 +148,11 @@ class PATSAPIClient(object):
 
         if response_status == 422:
             if 'message' in js:
-                self._relay_error(js['code'], js['message'])
+                if 'code' in js:
+                    code = js['code']
+                else:
+                    code = response_status
+                self._relay_error(code, js['message'])
             else:
                 # if we didn't get a JSON payload (eg Create RFP), just report the whole response
                 self._relay_error(response_status, response_text)
