@@ -214,7 +214,7 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def submit_rfp(self, sender_user_id=None, campaign_public_id=None, budget_amount=None, budgets=None, start_date=None, end_date=None, respond_by_date=None, comments="", publisher_id=None, publisher_emails=None, publishers=None, media_print=None, media_online=None, strategy=None, requested_products=None, attachments=None):
+    def submit_rfp(self, sender_user_id=None, campaign_public_id=None, currency='GBP', budget_amount=None, budgets=None, start_date=None, end_date=None, respond_by_date=None, comments="", publisher_id=None, publisher_emails=None, publishers=None, media_print=None, media_online=None, strategy=None, requested_products=None, attachments=None):
         """
         Send an RFP to one or more publishers.
         Can optionally include product IDs.
@@ -237,6 +237,7 @@ class PATSBuyer(PATSAPIClient):
             'responseDueDate': respond_by_date.strftime("%Y-%m-%d"),
             'comments': comments,
             'media': media,
+            'currency': currency,
             'strategy': strategy # must be one of defined set of terms
         }
         # user can supply "budget_amount" with one budget or "budgets" with a list
@@ -318,7 +319,7 @@ class PATSBuyer(PATSAPIClient):
     def search_rfps(self, user_id=None, advertiser_name=None, campaign_urn=None, rfp_start_date=None,rfp_end_date=None,response_due_date=None,status=None):
         """
         Search for RFPs by advertiser name, campaign ID, RFP dates, response due date and/or status.
-        http://developer.mediaocean.com/docs/read/rfp_api/Search_for_rfps
+        http://developer.mediaocean.com/docs/rfp_api/Search_for_rfps
         """
         # /agencies/35-1-1W-1/rfps?advertiserName=Jaguar Land Rover&campaignUrn=someUrn&rfpStartDate=2014-08-10&rfpEndDate=2015-01-10&responseDueDate=2015-08-25&status=SENT
         if user_id is None:

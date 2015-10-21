@@ -220,17 +220,18 @@ class CampaignDetails(JSONSerializable):
     """
     CampaignDetails - 
     """
-    organisation_id = '' # 
-    person_id = '' # 'amh1' or 'brenddlo'
-    company_id = '' # 'PATS3'
-    campaign_name = '' # "BQ Monday test campaign 1"
-    external_campaign_id = '' # "BQMONDAYTEST1"
-    start_date = '' # "2015-02-01"
-    end_date = '' # "2015-02-28"
-    advertiser_code = '' # code of advertiser, eg "DEM"
-    media_mix = [] # { "Media": [ { "MediaMix": "Online" }, { "MediaMix": "Print" } ] }
-    campaign_budget = 0 # 1000000
-    external_campaign_id = '' # "BQMONDAYTEST1"
+    organisation_id = ''        # 
+    person_id = ''              # 'amh1' or 'brenddlo'
+    company_id = ''             # 'PATS3'
+    campaign_name = ''          # eg "BQ Monday test campaign 1"
+    external_campaign_id = ''   # eg "BQMONDAYTEST1"
+    start_date = ''             # eg "2015-02-01"
+    end_date = ''               # eg "2015-02-28"
+    advertiser_code = ''        # code of advertiser, eg "DEM"
+    media_mix = []  # eg { "Media": [ { "MediaMix": "Online" }, { "MediaMix": "Print" } ] }
+    campaign_budget = 0         # eg 1000000
+    multi_currency = False      # flag that campaign can take non-GBP currencies
+    external_campaign_id = ''   # "BQMONDAYTEST1"
 
     def __init__(self, *args, **kwargs):
         self.organisation_id = kwargs.get('organisation_id', '')
@@ -249,6 +250,7 @@ class CampaignDetails(JSONSerializable):
         self.digital_campaign = kwargs.get('digital_campaign', [])
         self.digital_campaign_budget = kwargs.get('digital_campaign_budget', [])
         self.campaign_budget = kwargs.get('campaign_budget', '')
+        self.multi_currency = kwargs.get('multi_currency', False)
         self.external_campaign_id = kwargs.get('external_campaign_id', '')
 
     def dict_repr(self):
@@ -260,7 +262,8 @@ class CampaignDetails(JSONSerializable):
             # update MediaBudget below
             "ExternalDetails": {
                 "CampaignSourceID": self.external_campaign_id
-            }
+            },
+            "MultiCurrency": self.multi_currency
         }
         if self.campaign_budget and (self.print_campaign_budget or self.digital_campaign_budget):
             raise PATSException("Campaign can't have both individual budgets and a campaign budget")
@@ -352,7 +355,8 @@ class InsertionOrderLineItem(JSONSerializable):
     lineNumber = None # "1",
     externalPlacementId = None # ":"TestOrder-Monday-NewsUK-1-001",
     lineItemExternalId = None # used in proposals apparently
-    placementName = None # ":"Times Sport Banner",
+    placementName = None # "Times Sport Banner",
+    lineItemName = None # used on seller side for revisions and viewing orders
     costMethod = None # "CPM",
     rate = None # "15.0",
     plannedCost = None # "30000.00",
@@ -391,6 +395,7 @@ class InsertionOrderLineItem(JSONSerializable):
         self.externalPlacementId = self.getvar('externalPlacementId', '', args, kwargs)
         self.lineItemExternalId = self.getvar('lineItemExternalId', '', args, kwargs)
         self.placementName = self.getvar('placementName', '', args, kwargs)
+        self.lineItemName = self.getvar('lineItemName', '', args, kwargs)
         self.costMethod = self.getvar('costMethod', '', args, kwargs)
         self.unitType = self.getvar('unitType', '', args, kwargs)
         self.plannedCost = self.getvar('plannedCost', None, args, kwargs)
@@ -467,9 +472,10 @@ class InsertionOrderLineItem(JSONSerializable):
                     "name": "SUBSECTION",
                     "value": self.subsection
                 })
-            # for no good reason, on the seller side placementName is called "name"
+            # on the seller side placementName is called "lineItemName"
             dict.update({
-                "name": self.placementName,
+                "lineItemName": self.lineItemName,
+                "placementName": self.placementName,
                 # we also have a separate buyType in revision mode only
                 "buyType": self.buyType,
                 "customColumns": customColumns
@@ -493,7 +499,7 @@ class InsertionOrderLineItem(JSONSerializable):
         return dict
 
 class InsertionOrderLineItemPrint(InsertionOrderLineItem):
-    # lineNumber, externalPlacementId, placementName, costMethod, plannedCost,
+    # lineNumber, externalPlacementId, lineItemName, costMethod, plannedCost,
     # unitType, subMediaType, section, subsection, buyCategory, packageType, productId all handled in parent class
 
     # for validation
@@ -672,17 +678,6 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
             dict.update({
                 "rate": "{0:.4f}".format(self.rate),
             })
-            #if mode == "buyer":
-            #    dict.update({
-            #        "rate": "{0:.4f}".format(self.rate),
-            #    })
-            #else:
-            #    dict.update({
-            #        "rate": {
-            #            "amount": "{0:.4f}".format(self.rate),
-            #            "currencyCode": "GBP"
-            #        }
-            #    })
         if self.plannedCost:
             if mode == "buyer":
                 dict.update({
@@ -691,11 +686,6 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
             else:
                 dict.update({
                     "cost": "{0:.2f}".format(self.plannedCost),
-                #    "cost": {
-                #        "amount": "{0:.2f}".format(self.plannedCost),
-                #        "amount": "{0:.2f}".format(self.plannedCost),
-                #        "currencyCode": "GBP"
-                #    }
                 })
         if self.primaryPlacement:
             dict.update({
@@ -704,12 +694,22 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
         if self.flighting:
             flightingArray = []
             for flight in self.flighting:
-                flightingArray.append(
+                if mode == "seller":
+                    flightingArray.append(
                       {
-                        "startDate":flight['startDate'].strftime("%Y-%m-%d"),
-                        "endDate":flight['endDate'].strftime("%Y-%m-%d"),
-                        "unitAmount":flight['unitAmount'],
-                        "plannedCost":"{0:.2f}".format(flight['plannedCost'])
+                        "year": flight['year'],
+                        "month": flight['month'],
+                        "units": flight['units'],
+                        "plannedCost": "{0:.2f}".format(flight['plannedCost'])
+                      }
+                    )
+                else:
+                    flightingArray.append(
+                      {
+                        "startDate": flight['startDate'].strftime("%Y-%m-%d"),
+                        "endDate": flight['endDate'].strftime("%Y-%m-%d"),
+                        "unitAmount": flight['unitAmount'],
+                        "plannedCost": "{0:.2f}".format(flight['plannedCost'])
                       }
                 )
             dict.update({
@@ -724,29 +724,43 @@ class ProposalLineItem(JSONSerializable):
     """
     lineItemExternalId = None
     productId = None
-    productName = None
+    lineItemName = None
     section = None
     subsection = None
     subMediaType = None
     unitType = None
+    unitAmount = None
     rate = None
-    units = None
+    plannedCost = None
     costMethod = None
+    placementType = None
     buyCategory = None
     periods = []
+    supplierPlacementParentReference = None
+    supplierPlacementReference = None
+    subsection = None
+    lineNumber = None
+    target = None
 
     def __init__(self, *args, **kwargs):
         self.lineItemExternalId = kwargs.get('lineItemExternalId', '')
         self.productId = kwargs.get('productId', '')
-        self.productName = kwargs.get('productName', '')
+        self.lineItemName = kwargs.get('lineItemName', '')
+        self.placementType = kwargs.get('placementType', '')
+        self.buyCategory = kwargs.get('buyCategory', '')
+        self.subMediaType = kwargs.get('subMediaType', '')
         self.section = kwargs.get('section', '')
         self.subsection = kwargs.get('subsection', '')
-        self.subMediaType = kwargs.get('subMediaType', '')
         self.unitType = kwargs.get('unitType', '')
-        self.rate = kwargs.get('rate', '')
-        self.units = kwargs.get('units', '')
+        self.unitAmount = kwargs.get('unitAmount', 0)
+        self.rate = kwargs.get('rate', 0.0)
+        self.plannedCost = kwargs.get('plannedCost', 0.0)
         self.costMethod = kwargs.get('costMethod', '')
-        self.periods = kwargs.get('periods', [])
+        self.supplierPlacementParentReference = kwargs.get('supplierPlacementParentReference', '')
+        self.supplierPlacementReference = kwargs.get('supplierPlacementReference', '')
+        self.subsection = kwargs.get('subsection', '')
+        self.lineNumber = kwargs.get('lineNumber', 0)
+        self.target = kwargs.get('target', '')
 
     def dict_repr(self):
         dict = {
@@ -754,14 +768,21 @@ class ProposalLineItem(JSONSerializable):
             "lineItemExternalId":self.lineItemExternalId,
             # same in orders
             "productId":self.productId,
-            "productName": self.productName,
+            "lineItemName": self.lineItemName,
             "section":self.section,
             "subsection":self.subsection,
+            "buyCategory":self.buyCategory,
+            "placementType":self.placementType,
             "subMediaType":self.subMediaType,
             "unitType":self.unitType,
+            "unitAmount":self.unitAmount,
             "rate":"{0:.4f}".format(self.rate),
-            "units":self.units,
+            "plannedCost":"{0:.2f}".format(self.plannedCost),
             "costMethod":self.costMethod,
+            "supplierPlacementParentReference":self.supplierPlacementParentReference,
+            "supplierPlacementReference":self.supplierPlacementReference,
+            "lineNumber":self.lineNumber,
+            "target":self.target
         }
         if self.periods:
             dict.update({
@@ -769,27 +790,29 @@ class ProposalLineItem(JSONSerializable):
             })
         return dict
 
-    def getCost(self):
-        # the weird proposal line item definition doesn't have a cost field, just rate and units.
-        # so we have to calcuate it here to know what our value should be for testing purposes.
-        cost = 0
-        if self.costMethod == 'CPM':
-            cost = self.units * self.rate / 1000
-        elif self.costMethod == 'Flat':
-            cost = self.rate
-        else:
-            cost = self.units * self.rate
-        return cost
+#    def getCost(self):
+#        # the weird proposal line item definition doesn't have a cost field, just rate and units.
+#        # so we have to calcuate it here to know what our value should be for testing purposes.
+#        cost = 0
+#        if self.costMethod == 'CPM':
+#            cost = self.units * self.rate / 1000
+#        elif self.costMethod == 'Flat':
+#            cost = self.rate
+#        else:
+#            cost = self.units * self.rate
+#        return cost
 
 class ProposalLineItemDigital(ProposalLineItem):
     """
     Again, this shouldn't be necessary - get rid of it ASAP!
     """
     site = None
-    dimensionsAndPosition = None
+    dimensions = None
+    dimensionsPosition = None
     flightStart = None
     flightEnd = None
     servedBy = None
+    packageType = None
 
     # for validation
     # see http://developer.mediaocean.com/docs/proposals_api/Proposals_API_reference_data#buy_categories
@@ -807,11 +830,13 @@ class ProposalLineItemDigital(ProposalLineItem):
     def __init__(self, *args, **kwargs):
         super(ProposalLineItemDigital, self).__init__(*args, **kwargs)
         self.site = kwargs.get('site', '')
-        self.buyCategory = kwargs.get('buyCategory', '')
-        self.dimensionsAndPosition = kwargs.get('dimensionsAndPosition', '')
+        self.dimensions= kwargs.get('dimensions', '')
+        self.dimensionsPosition = kwargs.get('dimensionsPosition', '')
         self.flightStart = kwargs.get('flightStart', '')
         self.flightEnd = kwargs.get('flightEnd', '')
-        self.servedBy = kwargs.get('servedBy', '')
+        self.servedBy = kwargs.get('servedBy', '3rd Party')
+        self.periods = kwargs.get('periods', [])
+        self.packageType = kwargs.get('packageType', 'Standalone')
         #if self.buyCategory not in self.possible_buy_categories_online:
         #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
         #if self.servedBy not in self.possible_servedby:
@@ -821,12 +846,15 @@ class ProposalLineItemDigital(ProposalLineItem):
         dict = super(ProposalLineItemDigital, self).dict_repr(*args, **kwargs)
         dict.update({
             "site":self.site,
-            "buyCategory":self.buyCategory,
-            "dimensionsAndPosition":self.dimensionsAndPosition,
+            "dimensions":self.dimensions,
+            "dimensionsPosition":self.dimensionsPosition,
             "servedBy":self.servedBy,
+            "packageType":self.packageType,
             "flightStart":self.flightStart.strftime("%Y-%m-%d"),
-            "flightEnd":self.flightEnd.strftime("%Y-%m-%d")
+            "flightEnd":self.flightEnd.strftime("%Y-%m-%d"),
         })
+        if self.periods:
+            dict.update({ "periods": self.periods })
         return dict
 
 class ProposalLineItemPrint(ProposalLineItem):
@@ -839,6 +867,7 @@ class ProposalLineItemPrint(ProposalLineItem):
     color = None
     position = None
     coverDate = None
+    placementType = None # (print only)
 
     # for validation
     # should be in http://developer.mediaocean.com/docs/read/proposals_api/Proposals_API_reference_data
@@ -858,6 +887,7 @@ class ProposalLineItemPrint(ProposalLineItem):
         self.color = kwargs.get('color', '')
         self.position = kwargs.get('position', '')
         self.coverDate = kwargs.get('coverDate', '')
+        self.placementType = kwargs.get('placementType', '') # print only
         #if self.buyCategory not in self.possible_buy_categories_print:
         #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
@@ -871,5 +901,6 @@ class ProposalLineItemPrint(ProposalLineItem):
             "color":self.color,
             "position":self.position,
             "coverDate":self.coverDate.strftime("%Y-%m-%d"),
+            "placementType":self.placementType,
         })
         return dict
