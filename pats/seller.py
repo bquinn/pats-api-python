@@ -645,11 +645,11 @@ class PATSSeller(PATSAPIClient):
         digital_line_items_obj = []
         if digital_line_items:
             for line_item in digital_line_items:
-                digital_line_items_obj.append(line_item.dict_repr())
+                digital_line_items_obj.append(line_item.dict_repr(mode="seller"))
         print_line_items_obj = []
         if print_line_items:
             for line_item in print_line_items:
-                print_line_items_obj.append(line_item.dict_repr())
+                print_line_items_obj.append(line_item.dict_repr(mode="seller"))
 
         data = {
             "rfpPublicId": rfp_id,

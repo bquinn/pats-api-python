@@ -37,7 +37,7 @@ import re
 import string
 from urllib import urlencode
 
-VERSION = '0.5'
+VERSION = '0.6' # updated for PATS release 2015.7 APIs
 
 class PATSException(Exception):
     pass
@@ -309,6 +309,7 @@ class InsertionOrderDetails(JSONSerializable):
     terms_and_conditions = []
     respond_by_date = None # "2015-01-20"
     additional_info = None # "",
+    currency = None
     message = None # "Here's a sample order for the L'Oreal campaign."
     notify_emails = [] # ":["brendanquinnoz@gmail.com"]
 
@@ -332,6 +333,7 @@ class InsertionOrderDetails(JSONSerializable):
         self.respond_by_date = kwargs.get('respond_by_date', '')
         self.additional_info = kwargs.get('additional_info', '')
         self.message = kwargs.get('message', '')
+        self.currency = kwargs.get('currency', 'GBP')
         self.notify_emails = kwargs.get('notify_emails', [])
 
     def dict_repr(self):
@@ -347,15 +349,17 @@ class InsertionOrderDetails(JSONSerializable):
             "respondByDate": self.respond_by_date.strftime("%Y-%m-%d"), 
             "additionalInfo": self.additional_info, 
             "message": self.message,
+            "currency": self.currency,
             "notifyEmails": self.notify_emails # array of strings
         }
         return dict
 
-class InsertionOrderLineItem(JSONSerializable):
+class LineItem(JSONSerializable):
     lineNumber = None # "1",
     externalPlacementId = None # ":"TestOrder-Monday-NewsUK-1-001",
     lineItemExternalId = None # used in proposals apparently
     placementName = None # "Times Sport Banner",
+    placementType = None # "Display" (buy type),
     lineItemName = None # used on seller side for revisions and viewing orders
     costMethod = None # "CPM",
     rate = None # "15.0",
@@ -366,7 +370,8 @@ class InsertionOrderLineItem(JSONSerializable):
     subMediaType = None #  "Display (Digital)",
     productId = None # "TIMESSPORTBANNER",
     buyCategory = None # "Standard",
-    buyType = None # "Display", only used in revisions
+    buyType = None # "Display", only used in revisions - not used any more in 2015.7?
+    placementType = None # "Display", only used in revisions
     packageType = None # "Standalone",
     packageName = None # "MyCoolPackage",
     supplierPlacementParentReference = None # to group items together across orders (eg AccessOne)
@@ -395,9 +400,11 @@ class InsertionOrderLineItem(JSONSerializable):
         self.externalPlacementId = self.getvar('externalPlacementId', '', args, kwargs)
         self.lineItemExternalId = self.getvar('lineItemExternalId', '', args, kwargs)
         self.placementName = self.getvar('placementName', '', args, kwargs)
+        self.placementType = self.getvar('placementType', '', args, kwargs)
         self.lineItemName = self.getvar('lineItemName', '', args, kwargs)
         self.costMethod = self.getvar('costMethod', '', args, kwargs)
         self.unitType = self.getvar('unitType', '', args, kwargs)
+        self.unitAmount = self.getvar('unitAmount', 0, args, kwargs)
         self.plannedCost = self.getvar('plannedCost', None, args, kwargs)
         self.costMethod = self.getvar('costMethod', '', args, kwargs)
         self.buyCategory = self.getvar('buyCategory', '', args, kwargs)
@@ -422,15 +429,18 @@ class InsertionOrderLineItem(JSONSerializable):
     def dict_repr(self, mode="buyer"):
         dict = {
             "lineNumber": self.lineNumber,
-            "externalPlacementId": self.externalPlacementId,
             "packageType": self.packageType,
             "costMethod": self.costMethod,
             "unitType": self.unitType,
             "section": self.section,
+            "placementType": self.placementType,
             "buyCategory": self.buyCategory,
             "comments": self.comments,
-            "target": self.target,
         }
+        if self.externalPlacementId != '':
+            dict.update({
+                "externalPlacementId": self.externalPlacementId
+            })
         if self.supplierPlacementParentReference != None:
             dict.update({
                 "supplierPlacementParentReference": self.supplierPlacementParentReference
@@ -439,7 +449,7 @@ class InsertionOrderLineItem(JSONSerializable):
             dict.update({
             "supplierPlacementReference": self.supplierPlacementReference
             })
-        if self.rate != None:
+        if self.rate != None and self.packageType != "Child":
             dict.update({
                 "rate": "{0:.4f}".format(self.rate)
             })
@@ -468,18 +478,19 @@ class InsertionOrderLineItem(JSONSerializable):
                     "value": self.subMediaType
                 })
             if self.subsection:
-                customColumns.append({
-                    "name": "SUBSECTION",
-                    "value": self.subsection
+                dict.update({
+                    "subsection": self.subsection,
                 })
             # on the seller side placementName is called "lineItemName"
             dict.update({
                 "lineItemName": self.lineItemName,
-                "placementName": self.placementName,
-                # we also have a separate buyType in revision mode only
-                "buyType": self.buyType,
                 "customColumns": customColumns
             })
+            if self.buyType != '':
+                # we also have a separate buyType in revision mode only
+                dict.update({
+                    "buyType": self.buyType
+                })
         if self.externalPlacementId:
             dict.update({
                 "externalPlacementId": self.externalPlacementId
@@ -493,12 +504,17 @@ class InsertionOrderLineItem(JSONSerializable):
                 "productId": self.productId
             })
         if self.packageName:
-            dict.update({
-                "packageName": self.packageName
-            })
+            if mode == "buyer":
+                dict.update({
+                    "packageName": self.packageName,
+                })
+            else:
+                dict.update({
+                    "groupName": self.packageName
+                })
         return dict
 
-class InsertionOrderLineItemPrint(InsertionOrderLineItem):
+class LineItemPrint(LineItem):
     # lineNumber, externalPlacementId, lineItemName, costMethod, plannedCost,
     # unitType, subMediaType, section, subsection, buyCategory, packageType, productId all handled in parent class
 
@@ -521,6 +537,7 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
     units = 0
     color = None # ":"4CLR",
     colorName = None # ":"4 colour",
+    position = None # New
     printPosition = None # ":"Front Half",
     positionName = None # ":"Front Half",
     isPositionGuaranteed = None # ":"false",
@@ -531,70 +548,116 @@ class InsertionOrderLineItemPrint(InsertionOrderLineItem):
     # }
 
     def __init__(self, *args, **kwargs):
-        super(InsertionOrderLineItemPrint, self).__init__(*args, **kwargs)
+        super(LineItemPrint, self).__init__(*args, **kwargs)
         self.publication = self.getvar('publication', '', args, kwargs)
         self.size = self.getvar('size', '', args, kwargs)
         self.color = self.getvar('color', '', args, kwargs)
         self.units = self.getvar('units', '', args, kwargs)
+        self.unitAmount = self.getvar('unitAmount', '', args, kwargs)
+        self.position = self.getvar('position', '', args, kwargs)
         self.printPosition = self.getvar('printPosition', '', args, kwargs)
         self.region = self.getvar('region', '', args, kwargs)
         self.publication = self.getvar('publication', '', args, kwargs)
-        self.isPositionGuaranteed = self.getvar('isPositionGuaranteed', '', args, kwargs)
-        self.includeInDigitalEdition = self.getvar('includeInDigitalEdition', '', args, kwargs)
+        self.isPositionGuaranteed = self.getvar('isPositionGuaranteed', False, args, kwargs)
+        self.includeInDigitalEdition = self.getvar('includeInDigitalEdition', False, args, kwargs)
         self.coverDate = self.getvar('coverDate', '', args, kwargs)
         self.saleDate = self.getvar('saleDate', '', args, kwargs)
         self.sizeNumCols = self.getvar('sizeNumCols', '', args, kwargs)
         self.sizeNumUnits = self.getvar('sizeNumUnits', '', args, kwargs)
 
         # validation
-        if self.buyCategory not in self.possible_buy_categories_print:
-            raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        #if self.buyCategory not in self.possible_buy_categories_print:
+        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
     def dict_repr(self, mode="buyer"):
-        dict = super(InsertionOrderLineItemPrint, self).dict_repr(mode)
-        printInsertion = {
+        dict = super(LineItemPrint, self).dict_repr(mode)
+        # in 2015.7, "color" "position" "size" moved to outside printInsertion
+        # (for sellers at least)
+        if mode == "buyer":
+            printInsertion = {
                 "size": self.size,
                 "color": self.color,
                 "printPosition": self.printPosition,
-                "isPositionGuaranteed":self.isPositionGuaranteed,
-                "includeInDigitalEdition": self.includeInDigitalEdition
-        }
-        if self.coverDate:
-            printInsertion.update({
-                "coverDate": self.coverDate.strftime("%Y-%m-%d")
+                # "position": self.position,
+            }
+            if self.buyCategory != "Production":
+                printInsertion.update({
+                    "isPositionGuaranteed":self.isPositionGuaranteed,
+                    "includeInDigitalEdition": self.includeInDigitalEdition
+                })
+            if self.coverDate:
+                printInsertion.update({
+                    "coverDate": self.coverDate.strftime("%Y-%m-%d")
+                })
+            if self.saleDate:
+                printInsertion.update({
+                    "saleDate": self.saleDate.strftime("%Y-%m-%d")
+                })
+            if self.copyDeadline:
+                printInsertion.update({
+                    "copyDeadline": self.copyDeadline.strftime("%Y-%m-%d")
+                })
+            if self.sizeNumCols:
+                printInsertion.update({
+                    "sizeNumCols": self.sizeNumCols
+                })
+            if self.sizeNumUnits:
+                printInsertion.update({
+                    "sizeNumUnits": self.sizeNumUnits
+                })
+        else:
+            dict.update({
+                "size": self.size,
+                "color": self.color,
+                "position": self.position,
             })
-        if self.saleDate:
-            printInsertion.update({
-                "saleDate": self.saleDate.strftime("%Y-%m-%d")
-            })
-        if self.copyDeadline:
-            printInsertion.update({
-                "copyDeadline": self.copyDeadline.strftime("%Y-%m-%d")
-            })
-        if self.sizeNumCols:
-            printInsertion.update({
-                "sizeNumCols": self.sizeNumCols
-            })
-        if self.sizeNumUnits:
-            printInsertion.update({
-                "sizeNumUnits": self.sizeNumUnits
-            })
+            if self.buyCategory != "Production":
+                dict.update({
+                    "isPositionGuaranteed":self.isPositionGuaranteed,
+                    "includeInDigitalEdition": self.includeInDigitalEdition
+                })
+            if self.coverDate:
+                dict.update({
+                    "coverDate": self.coverDate.strftime("%Y-%m-%d")
+                })
+            if self.saleDate:
+                printInsertion.update({
+                    "saleDate": self.saleDate.strftime("%Y-%m-%d")
+                })
+            if self.copyDeadline:
+                printInsertion.update({
+                    "copyDeadline": self.copyDeadline.strftime("%Y-%m-%d")
+                })
+            if self.sizeNumCols:
+                printInsertion.update({
+                    "sizeNumCols": self.sizeNumCols
+                })
+            if self.sizeNumUnits:
+                printInsertion.update({
+                    "sizeNumUnits": self.sizeNumUnits
+                })
         if self.units:
             dict.update({
                 # digital has "unitAmount" but print has "units"
                 "units": self.units
             })
+        if self.unitAmount:
             dict.update({
-                "operation": self.operation,
+                # digital has "unitAmount" but print has "units"
+                "unitAmount": self.unitAmount
             })
         dict.update({
             "publication": self.publication,
-            "region": self.region,
-            "printInsertion": printInsertion
+            "operation": self.operation,
+            "region": self.region
         })
+        if mode=="buyer":    
+            dict.update({
+                "printInsertion": printInsertion
+            })
         return dict
 
-class InsertionOrderLineItemDigital(InsertionOrderLineItem):
+class LineItemDigital(LineItem):
     # for validation
     # see http://developer.mediaocean.com/docs/read/publisher_orders_api/Order_API_seller_reference_data
     possible_buy_categories_online = [
@@ -628,9 +691,10 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
     flighting = None #":[
     #    { "startDate":"2015-02-01", "endDate":"2015-02-28", "unitAmount":"2000000", "plannedCost":"30000.00" }
     #]
+    periods = None
 
     def __init__(self, *args, **kwargs):
-        super(InsertionOrderLineItemDigital, self).__init__(*args, **kwargs)
+        super(LineItemDigital, self).__init__(*args, **kwargs)
         self.lineItemId = self.getvar('lineItemId', None, args, kwargs)
         self.flightStart = self.getvar('flightStart', '', args, kwargs)
         self.flightEnd = self.getvar('flightEnd', '', args, kwargs)
@@ -640,21 +704,23 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
         self.servedBy = self.getvar('servedBy', '', args, kwargs)
         self.unitAmount = self.getvar('unitAmount', '', args, kwargs)
         self.flighting = self.getvar('flighting', '', args, kwargs)
+        self.periods = self.getvar('periods', '', args, kwargs)
         self.primaryPlacement = self.getvar('primaryPlacement', None, args, kwargs)
 
         # validation
         #if self.servedBy not in self.possible_servedby:
         #    raise PATSException("servedBy %s not valid." % self.servedBy)
-        if self.buyCategory not in self.possible_buy_categories_online:
-            raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        #if self.buyCategory not in self.possible_buy_categories_online:
+        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
 
     def dict_repr(self, mode="buyer"):
-        dict = super(InsertionOrderLineItemDigital, self).dict_repr(mode)
+        dict = super(LineItemDigital, self).dict_repr(mode)
         dict.update({
             "site": self.site,
             "dimensions": self.dimensions,
             "dimensionsPosition": self.dimensionsPosition,
-            "servedBy": self.servedBy
+            "servedBy": self.servedBy,
+            "target": self.target
         })
         # lineItemId only exists for revisions
         if mode == "seller" and self.lineItemId:
@@ -674,7 +740,7 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
             dict.update({
                 "unitAmount": self.unitAmount,
             })
-        if self.rate:
+        if self.rate and self.packageType != "Child":
             dict.update({
                 "rate": "{0:.4f}".format(self.rate),
             })
@@ -700,207 +766,32 @@ class InsertionOrderLineItemDigital(InsertionOrderLineItem):
                         "year": flight['year'],
                         "month": flight['month'],
                         "units": flight['units'],
-                        "plannedCost": "{0:.2f}".format(flight['plannedCost'])
                       }
                     )
                 else:
-                    flightingArray.append(
-                      {
-                        "startDate": flight['startDate'].strftime("%Y-%m-%d"),
-                        "endDate": flight['endDate'].strftime("%Y-%m-%d"),
-                        "unitAmount": flight['unitAmount'],
-                        "plannedCost": "{0:.2f}".format(flight['plannedCost'])
-                      }
+                   flightingArray.append(
+                     {
+                       "startDate": flight['startDate'].strftime("%Y-%m-%d"),
+                       "endDate": flight['endDate'].strftime("%Y-%m-%d"),
+                       "unitAmount": flight['unitAmount'],
+                       "plannedCost": "{0:.2f}".format(flight['plannedCost'])
+                     }
                 )
             dict.update({
                 "flighting": flightingArray
             })
-        return dict
-
-class ProposalLineItem(JSONSerializable):
-    """
-    This shouldn't be necessary - proposal line items should be the same as order ones.
-    But for now this is necessary.
-    """
-    lineItemExternalId = None
-    productId = None
-    lineItemName = None
-    section = None
-    subsection = None
-    subMediaType = None
-    unitType = None
-    unitAmount = None
-    rate = None
-    plannedCost = None
-    costMethod = None
-    placementType = None
-    buyCategory = None
-    periods = []
-    supplierPlacementParentReference = None
-    supplierPlacementReference = None
-    subsection = None
-    lineNumber = None
-    target = None
-
-    def __init__(self, *args, **kwargs):
-        self.lineItemExternalId = kwargs.get('lineItemExternalId', '')
-        self.productId = kwargs.get('productId', '')
-        self.lineItemName = kwargs.get('lineItemName', '')
-        self.placementType = kwargs.get('placementType', '')
-        self.buyCategory = kwargs.get('buyCategory', '')
-        self.subMediaType = kwargs.get('subMediaType', '')
-        self.section = kwargs.get('section', '')
-        self.subsection = kwargs.get('subsection', '')
-        self.unitType = kwargs.get('unitType', '')
-        self.unitAmount = kwargs.get('unitAmount', 0)
-        self.rate = kwargs.get('rate', 0.0)
-        self.plannedCost = kwargs.get('plannedCost', 0.0)
-        self.costMethod = kwargs.get('costMethod', '')
-        self.supplierPlacementParentReference = kwargs.get('supplierPlacementParentReference', '')
-        self.supplierPlacementReference = kwargs.get('supplierPlacementReference', '')
-        self.subsection = kwargs.get('subsection', '')
-        self.lineNumber = kwargs.get('lineNumber', 0)
-        self.target = kwargs.get('target', '')
-
-    def dict_repr(self):
-        dict = {
-            # called "externalPlacementId" for orders
-            "lineItemExternalId":self.lineItemExternalId,
-            # same in orders
-            "productId":self.productId,
-            "lineItemName": self.lineItemName,
-            "section":self.section,
-            "subsection":self.subsection,
-            "buyCategory":self.buyCategory,
-            "placementType":self.placementType,
-            "subMediaType":self.subMediaType,
-            "unitType":self.unitType,
-            "unitAmount":self.unitAmount,
-            "rate":"{0:.4f}".format(self.rate),
-            "plannedCost":"{0:.2f}".format(self.plannedCost),
-            "costMethod":self.costMethod,
-            "supplierPlacementParentReference":self.supplierPlacementParentReference,
-            "supplierPlacementReference":self.supplierPlacementReference,
-            "lineNumber":self.lineNumber,
-            "target":self.target
-        }
-        if self.periods:
-            dict.update({
-                "periods":self.periods
-            })
-        return dict
-
-#    def getCost(self):
-#        # the weird proposal line item definition doesn't have a cost field, just rate and units.
-#        # so we have to calcuate it here to know what our value should be for testing purposes.
-#        cost = 0
-#        if self.costMethod == 'CPM':
-#            cost = self.units * self.rate / 1000
-#        elif self.costMethod == 'Flat':
-#            cost = self.rate
-#        else:
-#            cost = self.units * self.rate
-#        return cost
-
-class ProposalLineItemDigital(ProposalLineItem):
-    """
-    Again, this shouldn't be necessary - get rid of it ASAP!
-    """
-    site = None
-    dimensions = None
-    dimensionsPosition = None
-    flightStart = None
-    flightEnd = None
-    servedBy = None
-    packageType = None
-
-    # for validation
-    # see http://developer.mediaocean.com/docs/proposals_api/Proposals_API_reference_data#buy_categories
-    possible_buy_categories_online = [
-        'Display', 'RichMedia', 'Mobile', 'Video',
-        'Interstitial','In-Game', 'Social', 'Sponsorship',
-        'Tablet', 'Text', 'Custom-Other'
-    ]
-    possible_servedby = [
-        'Site',
-        '3rd party',
-        'Other'
-    ]
-
-    def __init__(self, *args, **kwargs):
-        super(ProposalLineItemDigital, self).__init__(*args, **kwargs)
-        self.site = kwargs.get('site', '')
-        self.dimensions= kwargs.get('dimensions', '')
-        self.dimensionsPosition = kwargs.get('dimensionsPosition', '')
-        self.flightStart = kwargs.get('flightStart', '')
-        self.flightEnd = kwargs.get('flightEnd', '')
-        self.servedBy = kwargs.get('servedBy', '3rd Party')
-        self.periods = kwargs.get('periods', [])
-        self.packageType = kwargs.get('packageType', 'Standalone')
-        #if self.buyCategory not in self.possible_buy_categories_online:
-        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
-        #if self.servedBy not in self.possible_servedby:
-        #    raise PATSException("servedBy %s not valid." % self.servedBy)
-
-    def dict_repr(self, *args, **kwargs):
-        dict = super(ProposalLineItemDigital, self).dict_repr(*args, **kwargs)
-        dict.update({
-            "site":self.site,
-            "dimensions":self.dimensions,
-            "dimensionsPosition":self.dimensionsPosition,
-            "servedBy":self.servedBy,
-            "packageType":self.packageType,
-            "flightStart":self.flightStart.strftime("%Y-%m-%d"),
-            "flightEnd":self.flightEnd.strftime("%Y-%m-%d"),
-        })
         if self.periods:
             dict.update({ "periods": self.periods })
         return dict
 
-class ProposalLineItemPrint(ProposalLineItem):
-    """
-    Until we can share one line item class between both orders and proposals...
-    """
-    publication = None
-    region = None
-    size = None
-    color = None
-    position = None
-    coverDate = None
-    placementType = None # (print only)
+class InsertionOrderLineItemDigital(LineItemDigital):
+    pass
 
-    # for validation
-    # should be in http://developer.mediaocean.com/docs/read/proposals_api/Proposals_API_reference_data
-    # but they're not listed... raised as PATS-1035.
-    #possible_buy_categories_print = [
-    #    'Standard', 'RichMedia', 'Mobile', 'Video',
-    #    'Interstitial','In-Game', 'Social', 'Sponsorship',
-    #    'Tablet', 'Text', 'Custom-Other'
-    #]
+class ProposalLineItemDigital(LineItemDigital):
+    pass
 
-    def __init__(self, *args, **kwargs):
-        super(ProposalLineItemPrint, self).__init__(*args, **kwargs)
-        self.publication = kwargs.get('publication', '')
-        self.buyCategory = kwargs.get('buyCategory', '')
-        self.region = kwargs.get('region', '')
-        self.size = kwargs.get('size', '')
-        self.color = kwargs.get('color', '')
-        self.position = kwargs.get('position', '')
-        self.coverDate = kwargs.get('coverDate', '')
-        self.placementType = kwargs.get('placementType', '') # print only
-        #if self.buyCategory not in self.possible_buy_categories_print:
-        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
+class InsertionOrderLineItemPrint(LineItemPrint):
+    pass
 
-    def dict_repr(self, *args, **kwargs):
-        dict = super(ProposalLineItemPrint, self).dict_repr(*args, **kwargs)
-        dict.update({
-            "publication":self.publication,
-            "buyCategory":self.buyCategory,
-            "region":self.region,
-            "size":self.size,
-            "color":self.color,
-            "position":self.position,
-            "coverDate":self.coverDate.strftime("%Y-%m-%d"),
-            "placementType":self.placementType,
-        })
-        return dict
+class ProposalLineItemPrint(LineItemPrint):
+    pass
