@@ -189,7 +189,7 @@ class PATSAPIClient(object):
         """
         if error_code == 400:
             raise PATSException(
-                "Bad Request. The parameters you provided did not validate")
+                "Bad Request. The parameters you provided did not validate. Full response: %s" % reason)
         elif error_code == 401:
             raise PATSException(
                 "%s (Possibly invalid API key) %s" % (reason, self.api_key))
@@ -356,6 +356,7 @@ class InsertionOrderDetails(JSONSerializable):
 
 class LineItem(JSONSerializable):
     lineNumber = None # "1",
+    lineItemId = None # only used in revisions
     externalPlacementId = None # ":"TestOrder-Monday-NewsUK-1-001",
     lineItemExternalId = None # used in proposals apparently
     placementName = None # "Times Sport Banner",
@@ -397,6 +398,7 @@ class LineItem(JSONSerializable):
     def __init__(self, *args, **kwargs):
         self.operation = self.getvar('operation', 'Add', args, kwargs)
         self.lineNumber = self.getvar('lineNumber', '', args, kwargs)
+        self.lineItemId = self.getvar('lineItemId', None, args, kwargs)
         self.externalPlacementId = self.getvar('externalPlacementId', '', args, kwargs)
         self.lineItemExternalId = self.getvar('lineItemExternalId', '', args, kwargs)
         self.placementName = self.getvar('placementName', '', args, kwargs)
@@ -437,6 +439,11 @@ class LineItem(JSONSerializable):
             "buyCategory": self.buyCategory,
             "comments": self.comments,
         }
+        # lineItemId only exists for revisions
+        if mode == "seller" and self.lineItemId:
+            dict.update({
+                "lineItemId": self.lineItemId
+            })
         if self.externalPlacementId != '':
             dict.update({
                 "externalPlacementId": self.externalPlacementId
@@ -573,13 +580,14 @@ class LineItemPrint(LineItem):
         dict = super(LineItemPrint, self).dict_repr(mode)
         # in 2015.7, "color" "position" "size" moved to outside printInsertion
         # (for sellers at least)
+        printInsertion = {}
         if mode == "buyer":
-            printInsertion = {
+            printInsertion.update({
                 "size": self.size,
                 "color": self.color,
                 "printPosition": self.printPosition,
                 # "position": self.position,
-            }
+            })
             if self.buyCategory != "Production":
                 printInsertion.update({
                     "isPositionGuaranteed":self.isPositionGuaranteed,
@@ -609,7 +617,7 @@ class LineItemPrint(LineItem):
             dict.update({
                 "size": self.size,
                 "color": self.color,
-                "position": self.position,
+                "printPosition": self.printPosition,
             })
             if self.buyCategory != "Production":
                 dict.update({
@@ -643,7 +651,6 @@ class LineItemPrint(LineItem):
             })
         if self.unitAmount:
             dict.update({
-                # digital has "unitAmount" but print has "units"
                 "unitAmount": self.unitAmount
             })
         dict.update({
@@ -678,7 +685,6 @@ class LineItemDigital(LineItem):
     #    'Other'
     #]
 
-    lineItemId = None # only used in revisions
     site = None # ": "thetimes.co.uk" ,
     unitAmount = None # "2000000",
     flightStart = None # "2015-02-01",
@@ -695,13 +701,12 @@ class LineItemDigital(LineItem):
 
     def __init__(self, *args, **kwargs):
         super(LineItemDigital, self).__init__(*args, **kwargs)
-        self.lineItemId = self.getvar('lineItemId', None, args, kwargs)
         self.flightStart = self.getvar('flightStart', '', args, kwargs)
         self.flightEnd = self.getvar('flightEnd', '', args, kwargs)
         self.site = self.getvar('site', '', args, kwargs)
         self.dimensions = self.getvar('dimensions', '', args, kwargs)
         self.dimensionsPosition = self.getvar('dimensionsPosition', '', args, kwargs)
-        self.servedBy = self.getvar('servedBy', '', args, kwargs)
+        self.servedBy = self.getvar('servedBy', None, args, kwargs)
         self.unitAmount = self.getvar('unitAmount', '', args, kwargs)
         self.flighting = self.getvar('flighting', '', args, kwargs)
         self.periods = self.getvar('periods', '', args, kwargs)
@@ -719,13 +724,11 @@ class LineItemDigital(LineItem):
             "site": self.site,
             "dimensions": self.dimensions,
             "dimensionsPosition": self.dimensionsPosition,
-            "servedBy": self.servedBy,
             "target": self.target
         })
-        # lineItemId only exists for revisions
-        if mode == "seller" and self.lineItemId:
+        if self.servedBy:
             dict.update({
-                "lineItemId": self.lineItemId
+                "servedBy": self.servedBy
             })
         # package children don't have dates, units or loads of other things
         if self.flightStart:
