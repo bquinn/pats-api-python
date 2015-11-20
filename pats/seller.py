@@ -486,7 +486,7 @@ class PATSSeller(PATSAPIClient):
         print_line_items_obj = []
         if print_line_items:
             for line_item in print_line_items:
-                print_line_items_obj.append(line_item.dict_repr())
+                print_line_items_obj.append(line_item.dict_repr(mode="seller"))
             data.update({
                 "printLineItems": print_line_items_obj
             })
