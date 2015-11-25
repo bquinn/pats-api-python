@@ -44,14 +44,15 @@ AGENCY_API_DOMAIN = 'prisma-demo.api.mediaocean.com'
 
 class PATSBuyer(PATSAPIClient):
     agency_id = None
+    agency_group_id = None
 
-    def __init__(self, agency_id=None, api_key=None, debug_mode=False, raw_mode=False, session=None):
+    def __init__(self, agency_id=None, agency_group_id=None, api_key=None, debug_mode=False, raw_mode=False, session=None):
         """
         Create a new buyer-side PATS API object.
 
         Parameters:
-        - agency_id (required) : ID of the agency (buyer) whose catalogue
-          you are updating.
+        - agency_id (required) : ID of the agency (buyer) who your buy-side call represents.
+        - agency_group_id (required) : ID of the agency (buyer) group.
         - api_key (required) : API Key with buyer access
         - debug_mode (boolean) : Output full details of HTTP requests and responses
         - raw_mode (boolean) : Store output of request (as 'curl' equivalent) and
@@ -62,6 +63,7 @@ class PATSBuyer(PATSAPIClient):
         if agency_id == None:
             raise PATSException("Agency (aka buyer) ID is required")
         self.agency_id = agency_id
+        self.agency_group_id = agency_group_id
 
     def get_sellers(self, user_id=None):
         """
@@ -147,26 +149,31 @@ class PATSBuyer(PATSAPIClient):
                 "The campaign_details parameter should be a CampaignDetails instance"
             )
 
+        organisation_id = campaign_details.organisation_id or self.agency_id
         # Create the http object
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
-            'X-MO-Company-ID': campaign_details.company_id,
-            'X-MO-Organization-ID': campaign_details.organisation_id
+            'Accept': 'application/vnd.mediaocean.prisma-v1+json',
+            'X-MO-App': 'prisma',
+            'X-MO-Agency-Group-ID': self.agency_group_id,
+            'X-MO-Organization-ID': organisation_id
         }
         # person_id is supposed to be optional - currently it fails without it though - PATS-1013
-        if campaign_details.person_id:
+        if campaign_details.user_id:
             extra_headers.update({
-                'X-MO-Person-ID': campaign_details.person_id,
+                'X-MO-User-ID': campaign_details.user_id,
             })
-        js = self._send_request(
+        campaign_uri = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,
             "/campaigns",
             extra_headers,
             campaign_details.json_repr()
         )
-        # return full js object so we can parse errors
-        return js
+        # campaign_uri looks like https://prisma-devciny.api.mediaocean.com/campaigns/CP1D9G
+        match = re.search('https://(.+)?/campaigns/(.+?)$', campaign_uri)
+        if match:
+            campaign_id = match.group(2) 
+        return campaign_id
 
     def update_campaign(self, campaign_id=None, campaign_details=None):
         """
@@ -179,37 +186,41 @@ class PATSBuyer(PATSAPIClient):
             )
         if not campaign_id:
             raise PATSException("campaign_id is required")
+        organisation_id = campaign_details.organisation_id or self.agency_id
         # Create the http object
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
-            'X-MO-Person-ID': campaign_details.person_id,
-            'X-MO-Company-ID': campaign_details.company_id,
-            'X-MO-Organization-ID': campaign_details.organisation_id
+            'Accept': 'application/vnd.mediaocean.prisma-v1+json',
+            'X-MO-App': 'prisma',
+            'X-MO-User-ID': campaign_details.user_id,
+            'X-MO-Agency-Group-Id': self.agency_group_id,
+            'X-MO-Organization-ID': organisation_id
         }
-        js = self._send_request(
+        response = self._send_request(
             "PUT",
             AGENCY_API_DOMAIN,
             "/campaigns/%s" % campaign_id,
             extra_headers,
             campaign_details.json_repr()
         )
-        # return full js object so we can parse errors
-        return js
+        # used to return a js object, now it's just the URI of the object
+        return response
 
-    def view_campaign_detail(self, sender_user_id, campaign_public_id):
+    def view_campaign_detail(self, sender_user_id, campaign_id):
         """
-        There's no specific API to view a campaign, so we have to use
-        "view RFPs for campaign"
-        http://developer.mediaocean.com/docs/read/rfp_api/Get_rfps_by_camp_publicid
+        In 2015.8, we can now view a campaign! Here's a working payload:
+curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mrawha7rua8v" -H "X-MO-App: prisma" -H "X-MO-User-ID: brenddlo" -H "Accept: application/vnd.mediaocean.prisma-v1+json" -H "X-MO-Organization-ID: 35-IDSDKAD-7" -H "Content-Type: application/json" --data '{"startDate": "2015-12-02", "endDate": "2016-01-17", "advertiser": "HFC", "externalDetails": {"externalId": "PATS20151125165724N"}, "multiCurrency": false, "mediaBudget": {"medias": {"media": [{"mediaMix": "Print"}, {"mediaMix": "Online"}]}, "campaignBudget": 52852}, "campaignName": "RFP Unit test campaign 20151125165724N"}' "https://prisma-demo.api.mediaocean.com/campaigns/CP1DB2"
         """
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
-            'X-MO-User-Id': sender_user_id
+            'Accept': 'application/vnd.mediaocean.prisma-v1+json',
+            'X-MO-User-ID': sender_user_id,
+            'X-MO-App': 'prisma',
+            'X-MO-Organization-ID': self.agency_id,
+            'X-MO-Agency-Group-ID': self.agency_group_id
         }
         js = self._send_request(
             "GET",
             AGENCY_API_DOMAIN,
-            "/agencies/%s/campaigns/%s/rfps" % (self.agency_id, campaign_public_id),
+            "/campaigns/%s" % (campaign_id),
             extra_headers
         )
         return js

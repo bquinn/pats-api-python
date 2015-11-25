@@ -37,7 +37,7 @@ import re
 import string
 from urllib import urlencode
 
-VERSION = '0.6' # updated for PATS release 2015.7 APIs
+VERSION = '0.7' # in-progress update for 2015.8 APIs
 
 class PATSException(Exception):
     pass
@@ -135,6 +135,12 @@ class PATSAPIClient(object):
         if response_status == 400:
             self._relay_error(response_status, response_text)
 
+        if response_status == 201:
+            # 201 Created means we get the response as a Location: header
+            if 'location' not in response.msg:
+                self._relay_error(response_status, "Received 201 Created response but there's no Location: header. Response text is %s" % response_text)
+            return response.msg['location']
+
         # 422 is "unprocessable entity" but more details are given in the JS response
         # so we should use that instead
         if response_status != 200 and response_status != 422:
@@ -143,6 +149,9 @@ class PATSAPIClient(object):
         js = None
         if response_text == '':
             return ''
+
+        if response_status == 422:
+            self._relay_error(response_status, response_text)
 
         js = json.JSONDecoder().decode(response_text)
 
@@ -220,23 +229,22 @@ class CampaignDetails(JSONSerializable):
     """
     CampaignDetails - 
     """
-    organisation_id = ''        # 
-    person_id = ''              # 'amh1' or 'brenddlo'
-    company_id = ''             # 'PATS3'
+    organisation_id = ''        # '35-IDSDKAD-7'
+    agency_group_id = ''        # 'pats3'
+    user_id = ''                # 'brenddlo'
     campaign_name = ''          # eg "BQ Monday test campaign 1"
-    external_campaign_id = ''   # eg "BQMONDAYTEST1"
+    external_id = ''            # eg "BQMONDAYTEST1"
     start_date = ''             # eg "2015-02-01"
     end_date = ''               # eg "2015-02-28"
     advertiser_code = ''        # code of advertiser, eg "DEM"
     media_mix = []  # eg { "Media": [ { "MediaMix": "Online" }, { "MediaMix": "Print" } ] }
     campaign_budget = 0         # eg 1000000
     multi_currency = False      # flag that campaign can take non-GBP currencies
-    external_campaign_id = ''   # "BQMONDAYTEST1"
 
     def __init__(self, *args, **kwargs):
         self.organisation_id = kwargs.get('organisation_id', '')
-        self.person_id = kwargs.get('person_id', '')
-        self.company_id = kwargs.get('company_id', '')
+        self.agency_group_id = kwargs.get('agency_group_id', '')
+        self.user_id = kwargs.get('user_id', '')
         self.campaign_name = kwargs.get('campaign_name', '')
         self.start_date = kwargs.get('start_date', '')
         if not isinstance(self.start_date, datetime.date):
@@ -251,19 +259,19 @@ class CampaignDetails(JSONSerializable):
         self.digital_campaign_budget = kwargs.get('digital_campaign_budget', [])
         self.campaign_budget = kwargs.get('campaign_budget', '')
         self.multi_currency = kwargs.get('multi_currency', False)
-        self.external_campaign_id = kwargs.get('external_campaign_id', '')
+        self.external_id = kwargs.get('external_id', '')
 
     def dict_repr(self):
         dict = {
-            "CampaignName": self.campaign_name,
-            "StartDate": self.start_date.strftime("%Y-%m-%d"),
-            "EndDate": self.end_date.strftime("%Y-%m-%d"),
-            "Advertiser": self.advertiser_code,
+            "campaignName": self.campaign_name,
+            "startDate": self.start_date.strftime("%Y-%m-%d"),
+            "endDate": self.end_date.strftime("%Y-%m-%d"),
+            "advertiser": self.advertiser_code,
             # update MediaBudget below
-            "ExternalDetails": {
-                "CampaignSourceID": self.external_campaign_id
+            "externalDetails": {
+                "externalId": self.external_id
             },
-            "MultiCurrency": self.multi_currency
+            "multiCurrency": self.multi_currency
         }
         if self.campaign_budget and (self.print_campaign_budget or self.digital_campaign_budget):
             raise PATSException("Campaign can't have both individual budgets and a campaign budget")
@@ -274,21 +282,21 @@ class CampaignDetails(JSONSerializable):
         media_budget = {}
         if self.campaign_budget:
             media_budget.update({
-                "CampaignBudget": self.campaign_budget,
+                "campaignBudget": self.campaign_budget,
             })
         medias = []
         if self.print_campaign:
-            print_campaign = {"MediaMix": "Print"}
+            print_campaign = {"mediaMix": "Print"}
             if self.print_campaign_budget:
-                print_campaign.update({"Budget": self.print_campaign_budget})
+                print_campaign.update({"budget": self.print_campaign_budget})
             medias.append(print_campaign)
         if self.digital_campaign:
-            digital_campaign = {"MediaMix": "Online"}
+            digital_campaign = {"mediaMix": "Online"}
             if self.digital_campaign_budget:
-                digital_campaign.update({"Budget": self.digital_campaign_budget})
+                digital_campaign.update({"budget": self.digital_campaign_budget})
             medias.append(digital_campaign)
-        media_budget.update({ "Medias": { "Media": medias } })
-        dict.update({'MediaBudget': media_budget})
+        media_budget.update({ "medias": { "media": medias } })
+        dict.update({'mediaBudget': media_budget})
         return dict
         
 class InsertionOrderDetails(JSONSerializable):
