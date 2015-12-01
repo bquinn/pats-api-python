@@ -157,7 +157,6 @@ class PATSBuyer(PATSAPIClient):
             'X-MO-Agency-Group-ID': self.agency_group_id,
             'X-MO-Organization-ID': organisation_id
         }
-        # person_id is supposed to be optional - currently it fails without it though - PATS-1013
         if campaign_details.user_id:
             extra_headers.update({
                 'X-MO-User-ID': campaign_details.user_id,
@@ -207,8 +206,7 @@ class PATSBuyer(PATSAPIClient):
 
     def view_campaign_detail(self, sender_user_id, campaign_id):
         """
-        In 2015.8, we can now view a campaign! Here's a working payload:
-curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mrawha7rua8v" -H "X-MO-App: prisma" -H "X-MO-User-ID: brenddlo" -H "Accept: application/vnd.mediaocean.prisma-v1+json" -H "X-MO-Organization-ID: 35-IDSDKAD-7" -H "Content-Type: application/json" --data '{"startDate": "2015-12-02", "endDate": "2016-01-17", "advertiser": "HFC", "externalDetails": {"externalId": "PATS20151125165724N"}, "multiCurrency": false, "mediaBudget": {"medias": {"media": [{"mediaMix": "Print"}, {"mediaMix": "Online"}]}, "campaignBudget": 52852}, "campaignName": "RFP Unit test campaign 20151125165724N"}' "https://prisma-demo.api.mediaocean.com/campaigns/CP1DB2"
+        In 2015.8, we don't have to use workarounds, there's a view campaign call
         """
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.prisma-v1+json',
@@ -460,7 +458,7 @@ curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mr
         """
         create a print or digital order in PATS.
         agency_id: PATS ID of the buying agency (eg 35-IDSDKAD-7)
-        company_id: PATS ID of the buying company (eg PATS3)
+        agency_group_id: PATS ID of the buying company (eg PATS3)
         person_id: (optional?) PATS ID of the person sending the order (different
             from the person named as the buyer contact in the order)
         insertion_order_details: info about the insertion order (must be an InsertionOrderDetails object)
@@ -471,11 +469,8 @@ curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mr
         """
         # has default but can be overridden
         agency_id = kwargs.get('agency_id', self.agency_id)
-        if kwargs.get('company_id') == None:
-            raise PATSException("Company ID is required")
-        company_id = kwargs.get('company_id')
-        # person_id is optional
-        person_id = kwargs.get('person_id', None)
+        agency_group_id = kwargs.get('agency_group_id', self.agency_group_id)
+        user_id = kwargs.get('user_id', None)
         if kwargs.get('insertion_order_details') == None:
             raise PATSException("Insertion Order object is required")
         insertion_order = kwargs.get('insertion_order_details', None)
@@ -499,15 +494,15 @@ curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mr
                 'lineItems':line_items
             })
 
-        return self.create_order_raw(agency_id=agency_id, company_id=company_id, person_id=person_id, data=data)
+        return self.create_order_raw(agency_id=agency_id, agency_group_id=agency_group_id, user_id=user_id, data=data)
 
-    def create_order_raw(self, agency_id=None, company_id=None, person_id=None, data=None):
+    def create_order_raw(self, agency_id=None, agency_group_id=None, user_id=None, data=None):
         """
         create a print or digital order in PATS using a fully formed JSON payload
         instead of Python objects.
 
         agency_id: PATS ID of the buying agency (eg 35-IDSDKAD-7)
-        company_id: PATS ID of the buying company (eg PATS3)
+        agency_group_id: PATS ID of the buying company (eg PATS3)
         person_id: (optional?) PATS ID of the person sending the order (different
             from the person named as the buyer contact in the order)
         data: full JSON payload - must contain campaign ID, insertion order details and all line items
@@ -519,12 +514,12 @@ curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mr
             agency_id=self.agency_id # default but can be overridden
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
-            'X-MO-Company-ID': company_id,
+            'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': agency_id
         }
-        if person_id:
+        if user_id:
             extra_headers.update({
-                'X-MO-Person-ID': person_id
+                'X-MO-User-ID': user_id
             })
 
         # send request
@@ -537,13 +532,41 @@ curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mr
         )
         return js
 
-    def view_orders(self, user_id=None, start_date=None, end_date=None):
+    def view_orders(self, agency_id=None, agency_group_id=None, user_id=None, since_date=None):
         """
-        TODO - Mediaocean need to create an API for this!!
+        Retrieve a list of all orders booked since "since_date" (new in 2015.8)
         """
-        pass
+        if since_date == None:
+            raise PATSException("Since date is required")
+        if not isinstance(since_date, datetime.datetime) and not (isinstance(start_date, datetime.date)):
+            raise PATSException("Since date must be a Python date or datetime object")
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
+        if agency_id == None:
+            agency_id = self.agency_id
+        if user_id == None:
+            raise PATSException("User ID is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
+            'X-MO-Agency-Group-ID': agency_group_id,
+            'X-MO-Organization-ID': agency_id
+        }
+        if user_id:
+            extra_headers.update({
+                'X-MO-User-ID': user_id
+            })
 
-    def view_order_revisions(self, user_id=None, start_date=None, end_date=None):
+        # send request
+        js = self._send_request(
+            "PUT",
+            AGENCY_API_DOMAIN,
+            "/order/send",
+            extra_headers,
+            json.dumps(data)
+        )
+        return js
+
+    def view_order_revisions(self, agency_id=None, agency_group_id=None, user_id=None, start_date=None, end_date=None):
         """
         As a buyer, view all order revisions sent to me.
         http://developer.mediaocean.com/docs/read/orders_api/Get_orders [sic]
@@ -554,11 +577,17 @@ curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mr
             raise PATSException("Start date must be a Python date or datetime object")
         if not isinstance(end_date, datetime.datetime) and not (isinstance(end_date, datetime.date)):
             raise PATSException("If end date exists it must be a Python date or datetime object")
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
+        if agency_id == None:
+            agency_id = self.agency_id
         if user_id == None:
             raise PATSException("User ID is required")
 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-Organization-Id': agency_id,
+            'X-MO-Agency-Group-Id': agency_group_id,
             'X-MO-User-Id': user_id
         }
 
@@ -578,7 +607,7 @@ curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mr
         # TODO: Parse the response and return something more intelligible
         return js
 
-    def view_order_detail(self, user_id=None, order_id=None):
+    def view_order_detail(self, user_id=None, agency_id=None, agency_group_id=None, order_id=None):
         """
         As a buyer, view the detail of one order.
 
@@ -589,8 +618,15 @@ curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mr
             raise PATSException("User ID is required")
         if order_id == None:
             raise PATSException("Order ID is required")
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
+        if agency_id == None:
+            agency_id = self.agency_id
+
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-Organization-Id': agency_id,
+            'X-MO-Agency-Group-Id': agency_group_id,
             'X-MO-User-Id': user_id
         }
         js = self._send_request(
@@ -601,27 +637,27 @@ curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mr
         )
         return js
 
-    def view_order_status(self, person_id=None, company_id=None, campaign_id=None, order_id=None, version=None):
+    def view_order_status(self, user_id=None, agency_group_id=None, campaign_id=None, order_id=None, version=None):
         """
         As a buyer, view the status of an order I have just sent.
 
         http://developer.mediaocean.com/docs/read/orders_api/Get_order_status
         """
         # /order/status/{externalCampaignId}/{orderId}/{version}
-        if company_id == None:
-            raise PATSException("Company ID is required")
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
         if campaign_id == None:
             raise PATSException("Campaign ID is required")
         if order_id == None:
             raise PATSException("Order ID is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
-            'X-MO-Company-ID': company_id,
+            'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': self.agency_id
         }
-        if person_id:
+        if user_id:
             extra_headers.update({
-                'X-MO-Person-ID': person_id,
+                'X-MO-User-ID': user_id,
             })
         path = "/order/status/%s/%s" % (campaign_id, order_id)
         if version:
@@ -634,16 +670,22 @@ curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mr
         )
         return js
         
-    def return_order_revision(self, order_public_id, order_major_version, order_minor_version, user_id, seller_email, revision_due_date, comment):
+    def return_order_revision(self, agency_group_id=None, agency_id=None, order_public_id=None, order_major_version=None, order_minor_version=None, user_id=None, seller_email=None, revision_due_date=None, comment=None):
         """
         "Return order revision" which means "Send a message back to the person who sent this revision"
 
         http://developer.mediaocean.com/docs/read/orders_api/Return_revision
         """
+        if agency_id == None:
+            agency_id = self.agency_id
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
         # TODO: allow attachments
         # /agencies/{agency public id}/orders/{external public id}/revisions/return 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-Agency-Group-ID': agency_group_id,
+            'X-MO-Organization-ID': agency_id,
             'X-MO-User-ID': user_id
         }
         data = {
@@ -663,16 +705,23 @@ curl -v -X GET -H "X-MO-Agency-Group-Id: PATS3" -H "X-MO-API-Key: yt6wsdwrauz7mr
         )
         return js
 
-    def request_order_revision(self, order_public_id=None, order_major_version=None, order_minor_version=None, user_id=None, seller_email=None, revision_due_date=None, comment=None):
+    def request_order_revision(self, agency_group_id=None, agency_id=None, order_public_id=None, order_major_version=None, order_minor_version=None, user_id=None, seller_email=None, revision_due_date=None, comment=None):
         """
         "Request order revision" which means "Send a message to the person who received this order"
         http://developer.mediaocean.com/docs/read/orders_api/Request_order_revision
         """
         # TODO: allow attachments
+
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
+        if agency_id == None:
+            agency_id = self.agency_id
         # /agencies/{agency public id}/orders/{External Order Id}/revisions/request
         extra_headers = {
             # might be 1.0 but I'm guessing that's another bug in the docs
             'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-Agency-Group-ID': agency_group_id,
+            'X-MO-Organization-ID': agency_id,
             'X-MO-User-ID': user_id
         }
         data = {

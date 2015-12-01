@@ -42,13 +42,14 @@ PUBLISHER_API_DOMAIN = 'demo-publishers.api.mediaocean.com'
 class PATSSeller(PATSAPIClient):
     vendor_id = None
 
-    def __init__(self, vendor_id=None, api_key=None, debug_mode=False, raw_mode=False, session=None):
+    def __init__(self, vendor_id=None, api_key=None, user_id=None, debug_mode=False, raw_mode=False, session=None):
         """
         Create a new seller-side PATS API object.
 
         Parameters:
         - vendor_id (required) : ID of the vendor (publisher) whose catalogue
           you are updating.
+        - user_id (required) : Email of a valid user who is making the request
         - api_key (required) : API Key with seller access
         - debug_mode (boolean) : Output full details of HTTP requests and responses
         - raw_mode (boolean) : Store output of request (as 'curl' equivalent) and
@@ -59,6 +60,10 @@ class PATSSeller(PATSAPIClient):
         if vendor_id == None:
             raise PATSException("Vendor (aka publisher) ID is required")
         self.vendor_id = vendor_id
+
+        if user_id == None:
+            raise PATSException("User ID (email address) is required")
+        self.user_id = user_id
 
     def save_product_data(self, data=None): 
         """
@@ -350,7 +355,8 @@ class PATSSeller(PATSAPIClient):
             raise PATSException("Start date is required")
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json'
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-User-ID': self.user_id
         }
 
         path = '/vendors/%s/orders' % self.vendor_id
@@ -380,7 +386,8 @@ class PATSSeller(PATSAPIClient):
         if version == None:
             raise PATSException("version is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json'
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-User-Id': self.user_id
         }
         js = self._send_request(
             "GET",
@@ -448,7 +455,8 @@ class PATSSeller(PATSAPIClient):
         if order_id == None:
             raise PATSException("order ID is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json'
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-User-ID': self.user_id
         }
         path = '/vendors/%s/orders/%s/history' % (self.vendor_id, order_id)
         if full:
