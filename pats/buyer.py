@@ -454,49 +454,80 @@ class PATSBuyer(PATSAPIClient):
         # {"total":117,"products":[{"vendorPublicId":"35-EEBMG4J-4","productPublicId":"PC-11TU", ... }
         return js
 
-    def create_order(self, **kwargs):
+    def create_order(self, agency_id=None, agency_group_id=None, user_id=None, digital_line_items=None, print_line_items=None, **kwargs):
         """
-        create a print or digital order in PATS.
+        Create a print or digital order in PATS.
         agency_id: PATS ID of the buying agency (eg 35-IDSDKAD-7)
         agency_group_id: PATS ID of the buying company (eg PATS3)
-        person_id: (optional?) PATS ID of the person sending the order (different
+        user_id: (optional?) PATS ID of the person sending the order (different
             from the person named as the buyer contact in the order)
-        insertion_order_details: info about the insertion order (must be an InsertionOrderDetails object)
-        line_items: object inserted as "line_items" in the order
+        media_type: Either 'Print' or 'Online'
+        digital_line_items: object inserted as "line_items" in the order
+        print_line_items: object inserted as "line_items" in the order
 
         http://developer.mediaocean.com/docs/read/orders_api/Create_online_order
         http://developer.mediaocean.com/docs/read/orders_api/Create_print_order
         """
         # has default but can be overridden
-        agency_id = kwargs.get('agency_id', self.agency_id)
-        agency_group_id = kwargs.get('agency_group_id', self.agency_group_id)
-        user_id = kwargs.get('user_id', None)
-        if kwargs.get('insertion_order_details') == None:
-            raise PATSException("Insertion Order object is required")
-        insertion_order = kwargs.get('insertion_order_details', None)
-        if not isinstance(insertion_order, InsertionOrderDetails):
-            raise PATSException("insertion_order_details must be an instance of InsertionOrderDetails")
+        if agency_id == None:
+            agency_id = self.agency_id
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
+        if user_id == None:
+            user_id = kwargs.get('user_id', None)
+        media_type = kwargs.get('media_type', 'PRINT')
+        order_currency_code = kwargs.get('order_currency_code', 'PRINT')
+        external_order_id = kwargs.get('external_order_id', None)
+        vendor_id = kwargs.get('vendor_id', None)
+        recipient_emails = kwargs.get('recipient_emails', None)
+        buyer_first_name = kwargs.get('buyer_first_name', '')
+        buyer_last_name = kwargs.get('buyer_last_name', '')
+        buyer_email = kwargs.get('buyer_email', '')
+        notify_emails = kwargs.get('notify_emails', [])
+        additional_info = kwargs.get('additional_info', '')
+        order_comment = kwargs.get('order_comment', '')
+        respond_by_date = kwargs.get('respond_by_date', None)
+        terms_and_conditions_name = kwargs.get('terms_and_conditions_name', None)
+        terms_and_conditions_content = kwargs.get('terms_and_conditions_content', None)
 
         # order payload
         data = {
-            'externalCampaignId':kwargs.get('external_campaign_id', None),
-            'mediaType':kwargs.get('media_type', 'PRINT'),
-            'insertionOrder':insertion_order.dict_repr()
+            "externalId": external_order_id,
+            "mediaType": media_type,
+            "currencyCode": order_currency_code,
+            "vendorId": vendor_id,
+            "recipientEmails": recipient_emails,
+            "buyer": {
+                "firstName": buyer_first_name,
+                "lastName": buyer_last_name,
+                "email": buyer_email
+            },
+            "notifyEmails": notify_emails,
+            "additionalInfo": additional_info,
+            "comment": order_comment,
+            "respondByDate": respond_by_date.strftime("%Y-%m-%d"),
+            "termsAndConditions": {
+                "name": terms_and_conditions_name,
+                "content": terms_and_conditions_content
+            }
         }
         # technically line items are optional!
         if kwargs.get('line_items'):
             line_items = []
             for line_item in kwargs['line_items']:
-                if not line_item.operation:
-                    line_item.setOperation('Add')
                 line_items.append(line_item.dict_repr())
-            data.update({
-                'lineItems':line_items
-            })
+            if media_type == 'Online':
+                data.update({
+                    'digitalLineItems':line_items
+                })
+            else:
+                data.update({
+                    'printLineItems':line_items
+                })
 
         return self.create_order_raw(agency_id=agency_id, agency_group_id=agency_group_id, user_id=user_id, data=data)
 
-    def create_order_raw(self, agency_id=None, agency_group_id=None, user_id=None, data=None):
+    def create_order_raw(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, data=None):
         """
         create a print or digital order in PATS using a fully formed JSON payload
         instead of Python objects.
@@ -512,6 +543,8 @@ class PATSBuyer(PATSAPIClient):
         """
         if agency_id==None:
             agency_id=self.agency_id # default but can be overridden
+        if campaign_id==None:
+            raise PATSException("Campaign ID is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
             'X-MO-Agency-Group-ID': agency_group_id,
@@ -546,8 +579,10 @@ class PATSBuyer(PATSAPIClient):
             agency_id = self.agency_id
         if user_id == None:
             raise PATSException("User ID is required")
+        path = '/orders?since=%s' % since_date.strftime("%Y-%m-%d")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-App': 'prisma',
             'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': agency_id
         }
@@ -558,11 +593,10 @@ class PATSBuyer(PATSAPIClient):
 
         # send request
         js = self._send_request(
-            "PUT",
+            "GET",
             AGENCY_API_DOMAIN,
-            "/order/send",
-            extra_headers,
-            json.dumps(data)
+            path,
+            extra_headers
         )
         return js
 
@@ -607,15 +641,16 @@ class PATSBuyer(PATSAPIClient):
         # TODO: Parse the response and return something more intelligible
         return js
 
-    def view_order_detail(self, user_id=None, agency_id=None, agency_group_id=None, order_id=None):
+    def view_order_versions(self, user_id=None, agency_id=None, agency_group_id=None, campaign_id=None, order_id=None):
         """
-        As a buyer, view the detail of one order.
+        As a buyer, list versions of an order.
 
-        http://developer.mediaocean.com/docs/read/orders_api/Get_order_detail
+        http://developer.mediaocean.com/docs/buyer_orders/List_order_versions_buyer
         """
-        # /agencies/{agency public id}/orders/{External Order Id}/revisions
         if user_id == None:
             raise PATSException("User ID is required")
+        if campaign_id == None:
+            raise PATSException("Campaign ID is required")
         if order_id == None:
             raise PATSException("Order ID is required")
         if agency_group_id == None:
@@ -632,7 +667,45 @@ class PATSBuyer(PATSAPIClient):
         js = self._send_request(
             "GET",
             AGENCY_API_DOMAIN,
-            "/agencies/%s/orders/%s/revisions" % (self.agency_id, order_id),
+            "/campaigns/%s/orders/%s/versions" % (campaign_id, order_id),
+            extra_headers
+        )
+        return js
+
+
+    def view_order_version_detail(self, user_id=None, agency_id=None, agency_group_id=None, campaign_id=None, order_id=None, order_version=None):
+        """
+        As a buyer, view the detail of one order version.
+
+        was based on
+        http://developer.mediaocean.com/docs/read/orders_api/Get_order_detail
+        but is now changed to
+        http://developer.mediaocean.com/docs/buyer_orders/Get_order_version_details_buyer
+        """
+        # /agencies/{agency public id}/orders/{External Order Id}/revisions
+        if user_id == None:
+            raise PATSException("User ID is required")
+        if campaign_id == None:
+            raise PATSException("Campaign ID is required")
+        if order_id == None:
+            raise PATSException("Order ID is required")
+        if order_version == None:
+            raise PATSException("Order version is required")
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
+        if agency_id == None:
+            agency_id = self.agency_id
+
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-Organization-Id': agency_id,
+            'X-MO-Agency-Group-Id': agency_group_id,
+            'X-MO-User-Id': user_id
+        }
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            "/campaigns/%s/orders/%s/versions/%s" % (campaign_id, order_id, order_version),
             extra_headers
         )
         return js
