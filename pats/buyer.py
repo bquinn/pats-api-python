@@ -204,13 +204,13 @@ class PATSBuyer(PATSAPIClient):
         # used to return a js object, now it's just the URI of the object
         return response
 
-    def view_campaign_detail(self, sender_user_id, campaign_id):
+    def view_campaign_detail(self, user_id, campaign_id):
         """
         In 2015.8, we don't have to use workarounds, there's a view campaign call
         """
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.prisma-v1+json',
-            'X-MO-User-ID': sender_user_id,
+            'X-MO-User-ID': user_id,
             'X-MO-App': 'prisma',
             'X-MO-Organization-ID': self.agency_id,
             'X-MO-Agency-Group-ID': self.agency_group_id
@@ -600,17 +600,13 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def view_order_revisions(self, agency_id=None, agency_group_id=None, user_id=None, start_date=None, end_date=None):
+    def view_order_revisions(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, order_id=None, version=None):
         """
-        As a buyer, view all order revisions sent to me.
-        http://developer.mediaocean.com/docs/read/orders_api/Get_orders [sic]
+        As a buyer, view all revisions on a given order version.
+        (Note than in 2015.7 and previous, this would like *all* order revisions)
+        
+        http://developer.mediaocean.com/docs/buyer_orders/List_order_revs_buyer
         """
-        if start_date == None:
-            raise PATSException("Start date is required")
-        if not isinstance(start_date, datetime.datetime) and not (isinstance(start_date, datetime.date)):
-            raise PATSException("Start date must be a Python date or datetime object")
-        if not isinstance(end_date, datetime.datetime) and not (isinstance(end_date, datetime.date)):
-            raise PATSException("If end date exists it must be a Python date or datetime object")
         if agency_group_id == None:
             agency_group_id = self.agency_group_id
         if agency_id == None:
@@ -620,25 +616,19 @@ class PATSBuyer(PATSAPIClient):
 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-App': 'prisma',
             'X-MO-Organization-Id': agency_id,
             'X-MO-Agency-Group-Id': agency_group_id,
             'X-MO-User-Id': user_id
         }
 
-        path = '/agencies/%s/orders/revisions' % self.agency_id
-        if start_date and end_date:
-            # not sure if you can have one or the other on its own?
-            path += "?startDate=%s&endDate=%s" % (
-                start_date.strftime("%Y-%m-%d"),
-                end_date.strftime("%Y-%m-%d")
-            )
+        path = '/campaigns/%s/orders/%s/versions/%s/revisions' % (campaign_id, order_id, version)
         js = self._send_request(
             "GET",
             AGENCY_API_DOMAIN,
             path,
             extra_headers
         )
-        # TODO: Parse the response and return something more intelligible
         return js
 
     def view_order_versions(self, user_id=None, agency_id=None, agency_group_id=None, campaign_id=None, order_id=None):
@@ -660,6 +650,7 @@ class PATSBuyer(PATSAPIClient):
 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-App': 'prisma',
             'X-MO-Organization-Id': agency_id,
             'X-MO-Agency-Group-Id': agency_group_id,
             'X-MO-User-Id': user_id
@@ -682,7 +673,6 @@ class PATSBuyer(PATSAPIClient):
         but is now changed to
         http://developer.mediaocean.com/docs/buyer_orders/Get_order_version_details_buyer
         """
-        # /agencies/{agency public id}/orders/{External Order Id}/revisions
         if user_id == None:
             raise PATSException("User ID is required")
         if campaign_id == None:
@@ -698,6 +688,7 @@ class PATSBuyer(PATSAPIClient):
 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-App': 'prisma',
             'X-MO-Organization-Id': agency_id,
             'X-MO-Agency-Group-Id': agency_group_id,
             'X-MO-User-Id': user_id
@@ -706,6 +697,42 @@ class PATSBuyer(PATSAPIClient):
             "GET",
             AGENCY_API_DOMAIN,
             "/campaigns/%s/orders/%s/versions/%s" % (campaign_id, order_id, order_version),
+            extra_headers
+        )
+        return js
+
+    def view_order_revision_detail(self, user_id=None, agency_id=None, agency_group_id=None, campaign_id=None, order_id=None, order_version=None, order_revision=None):
+        """
+        As a buyer, view the detail of one order revision.
+
+        http://developer.mediaocean.com/docs/buyer_orders/Get_order_rev_details_buyer
+        """
+        if user_id == None:
+            raise PATSException("User ID is required")
+        if campaign_id == None:
+            raise PATSException("Campaign ID is required")
+        if order_id == None:
+            raise PATSException("Order ID is required")
+        if order_version == None:
+            raise PATSException("Order version is required")
+        if order_revision == None:
+            raise PATSException("Order revision is required")
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
+        if agency_id == None:
+            agency_id = self.agency_id
+
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-App': 'prisma',
+            'X-MO-Organization-Id': agency_id,
+            'X-MO-Agency-Group-Id': agency_group_id,
+            'X-MO-User-Id': user_id
+        }
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            "/campaigns/%s/orders/%s/versions/%s/revisions/%s" % (campaign_id, order_id, order_version, order_revision),
             extra_headers
         )
         return js
@@ -742,7 +769,37 @@ class PATSBuyer(PATSAPIClient):
             extra_headers
         )
         return js
-        
+
+    def get_order_attachment(self, user_id=None, agency_group_id=None, agency_id=None, campaign_id=None, order_id=None, attachment_id=None):
+        """
+        Get an attachment for an order (including the PDF of the order itself).
+        http://developer.mediaocean.com/docs/buyer_orders/Get_order_attachment_buyer
+        """
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
+        if agency_id == None:
+            agency_id = self.agency_id
+        if campaign_id == None:
+            raise PATSException("Campaign ID is required")
+        if user_id == None:
+            raise PATSException("User ID is required")
+        if order_id == None:
+            raise PATSException("Order ID is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-Agency-Group-Id': agency_group_id,
+            'X-MO-Organization-Id': agency_id,
+            'X-MO-User-Id': user_id,
+            'X-MO-App': 'prisma'
+        }
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            "/campaigns/%s/orders/%s/attachments/%s" % (campaign_id, order_id, attachment_id),
+            extra_headers
+        )
+        return js
+
     def return_order_revision(self, agency_group_id=None, agency_id=None, order_public_id=None, order_major_version=None, order_minor_version=None, user_id=None, seller_email=None, revision_due_date=None, comment=None):
         """
         "Return order revision" which means "Send a message back to the person who sent this revision"
@@ -778,10 +835,10 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def request_order_revision(self, agency_group_id=None, agency_id=None, order_public_id=None, order_major_version=None, order_minor_version=None, user_id=None, seller_email=None, revision_due_date=None, comment=None):
+    def request_order_revision(self, agency_group_id=None, agency_id=None, campaign_id=None, order_id=None, version=None, user_id=None, seller_email=None, revision_due_date=None, comment=None):
         """
         "Request order revision" which means "Send a message to the person who received this order"
-        http://developer.mediaocean.com/docs/read/orders_api/Request_order_revision
+        http://developer.mediaocean.com/docs/buyer_orders/Request_rev_buyer
         """
         # TODO: allow attachments
 
@@ -789,26 +846,22 @@ class PATSBuyer(PATSAPIClient):
             agency_group_id = self.agency_group_id
         if agency_id == None:
             agency_id = self.agency_id
-        # /agencies/{agency public id}/orders/{External Order Id}/revisions/request
         extra_headers = {
-            # might be 1.0 but I'm guessing that's another bug in the docs
             'Accept': 'application/vnd.mediaocean.order-v1+json',
             'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': agency_id,
             'X-MO-User-ID': user_id
         }
         data = {
-            'majorVersion': order_major_version,
-            'minorVersion': order_minor_version,
             'revisionDueBy': revision_due_date.strftime("%Y-%m-%d"),
             'comment': comment,
-            'email': seller_email,
+            'emails': [ seller_email ],
             'orderAttachments': [], # leave it blank for now
         }
         js = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,
-            "/agencies/%s/orders/%s/revisions/request" % (self.agency_id, order_public_id),
+            "/campaigns/%s/orders/%s/versions/%s/requestRevision" % (campaign_id, order_id, version),
             extra_headers,
             json.dumps(data)
         )
