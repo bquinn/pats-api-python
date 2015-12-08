@@ -41,6 +41,7 @@ PUBLISHER_API_DOMAIN = 'demo-publishers.api.mediaocean.com'
 
 class PATSSeller(PATSAPIClient):
     vendor_id = None
+    user_id = None
 
     def __init__(self, vendor_id=None, api_key=None, user_id=None, debug_mode=False, raw_mode=False, session=None):
         """
@@ -402,14 +403,12 @@ class PATSSeller(PATSAPIClient):
         """
         http://developer.mediaocean.com/docs/publisher_orders_api/Revision_status_summary
         """
+        if user_id is not None:
+            user_id = self.user_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json'
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-User-Id': self.user_id
         }
-        if user_id:
-            extra_headers.update({
-                'X-MO-User-Id': user_id
-            })
-
         path = '/vendors/%s/orders/%s/revisionstatus' % (self.vendor_id, order_id)
         js = self._send_request(
             "GET",
@@ -424,13 +423,9 @@ class PATSSeller(PATSAPIClient):
         http://developer.mediaocean.com/docs/publisher_orders_api/Revision_status_detail
         """
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json'
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-User-Id': self.user_id
         }
-        if user_id:
-            extra_headers.update({
-                'X-MO-User-Id': user_id
-            })
-
         path = '/vendors/%s/orders/%s/revisionstatus/detail?' % (self.vendor_id, order_id)
         if order_version:
             path += "orderVersion=%s" % order_version
@@ -581,7 +576,8 @@ class PATSSeller(PATSAPIClient):
         """
         extra_headers = {
             # this will probably change to "rfps" soon to be consistent with other headers
-            'Accept': 'application/vnd.mediaocean.rfp-v1+json'
+            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
+            'X-MO-User-Id': self.user_id
         }
         path = '/vendors/%s/rfps?' % self.vendor_id
         if start_date:
@@ -607,7 +603,8 @@ class PATSSeller(PATSAPIClient):
             raise PATSException("RFP ID is required")
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.proposal-v1+json'
+            'Accept': 'application/vnd.mediaocean.proposal-v1+json',
+            'X-MO-User-Id': self.user_id
         }
 
         js = self._send_request(
@@ -682,7 +679,8 @@ class PATSSeller(PATSAPIClient):
         if vendor_id == None:
             raise PATSException("Vendor (aka publisher) ID is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.proposal-v1+json'
+            'Accept': 'application/vnd.mediaocean.proposal-v1+json',
+            'X-MO-User-Id': self.user_id
         }
 
         js = self._send_request(
