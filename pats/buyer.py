@@ -204,16 +204,20 @@ class PATSBuyer(PATSAPIClient):
         # used to return a js object, now it's just the URI of the object
         return response
 
-    def view_campaign_detail(self, user_id, campaign_id):
+    def view_campaign_detail(self, agency_group_id=None, agency_id=None, user_id=None, campaign_id=None):
         """
         In 2015.8, we don't have to use workarounds, there's a view campaign call
         """
+        if agency_group_id is None:
+            agency_group_id = self.agency_group_id
+        if agency_id is None:
+            agency_id = self.agency_id
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.prisma-v1+json',
             'X-MO-User-ID': user_id,
             'X-MO-App': 'prisma',
-            'X-MO-Organization-ID': self.agency_id,
-            'X-MO-Agency-Group-ID': self.agency_group_id
+            'X-MO-Organization-ID': agency_id,
+            'X-MO-Agency-Group-ID': agency_group_id
         }
         js = self._send_request(
             "GET",
@@ -287,7 +291,7 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def view_rfp_detail(self, sender_user_id=None, rfp_id=None):
+    def view_rfp_detail(self, agency_group_id=None, agency_id=None, sender_user_id=None, rfp_id=None):
         """
         Get a single RFP using its public ID.
         http://developer.mediaocean.com/docs/read/rfp_api/Get_rfp_by_publicid
@@ -296,8 +300,14 @@ class PATSBuyer(PATSAPIClient):
             raise PATSException("RFP ID is required")
         if sender_user_id is None:
             raise PATSException("Sender User ID is required")
+        if agency_group_id is None:
+            agency_group_id = self.agency_group_id
+        if agency_id is None:
+            agency_id = self.agency_id
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'X-MO-Organization-ID': agency_id,
+            'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-User-Id': sender_user_id
         }
         js = self._send_request(
@@ -325,7 +335,7 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def search_rfps(self, user_id=None, advertiser_name=None, campaign_urn=None, rfp_start_date=None,rfp_end_date=None,response_due_date=None,status=None):
+    def search_rfps(self, agency_group_id=None, agency_id=None, user_id=None, advertiser_name=None, campaign_urn=None, rfp_start_date=None,rfp_end_date=None,response_due_date=None,status=None):
         """
         Search for RFPs by advertiser name, campaign ID, RFP dates, response due date and/or status.
         http://developer.mediaocean.com/docs/rfp_api/Search_for_rfps
@@ -333,8 +343,14 @@ class PATSBuyer(PATSAPIClient):
         # /agencies/35-1-1W-1/rfps?advertiserName=Jaguar Land Rover&campaignUrn=someUrn&rfpStartDate=2014-08-10&rfpEndDate=2015-01-10&responseDueDate=2015-08-25&status=SENT
         if user_id is None:
             raise PATSException("User ID is required")
+        if agency_id is None:
+            agency_id = self.agency_id
+        if agency_group_id is None:
+            agency_group_id = self.agency_group_id
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'X-MO-Organization-Id': agency_id,
+            'X-MO-Agency-Group-Id': agency_group_id,
             'X-MO-User-Id': user_id
         }
         path = '/agencies/%s/rfps' % self.agency_id
@@ -384,14 +400,21 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def return_proposal(self, sender_user_id=None, proposal_public_id=None, comments=None, due_date=None, emails=None, attachments=None):
+    def return_proposal(self, agency_group_id=None, agency_id=None, sender_user_id=None, proposal_public_id=None, comments=None, due_date=None, emails=None, attachments=None):
         """
         "Return a proposal", which means "send a comment back to the seller that sent me this proposal"
         http://developer.mediaocean.com/docs/read/rfp_api/Return_proposal
         """
+        if agency_group_id is None:
+            agency_group_id = self.agency_group_id
+        if agency_id is None:
+            agency_id = self.agency_id
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
-            'X-MO-User-Id': sender_user_id
+            'X-MO-User-Id': sender_user_id,
+            'X-MO-Agency-Group-ID': agency_group_id,
+            'X-MO-Organization-ID': agency_id,
+            'X-MO-App': 'prisma'
         }
         if proposal_public_id is None:
             raise PATSException("Proposal ID is required")
@@ -542,13 +565,16 @@ class PATSBuyer(PATSAPIClient):
         http://developer.mediaocean.com/docs/read/orders_api/Create_print_order
         """
         if agency_id==None:
-            agency_id=self.agency_id # default but can be overridden
+            agency_id=self.agency_id
+        if agency_group_id==None:
+            agency_group_id=self.agency_group_id
         if campaign_id==None:
             raise PATSException("Campaign ID is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
             'X-MO-Agency-Group-ID': agency_group_id,
-            'X-MO-Organization-ID': agency_id
+            'X-MO-Organization-ID': agency_id,
+            'X-MO-App': 'prisma'
         }
         if user_id:
             extra_headers.update({
@@ -800,7 +826,7 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def return_order_revision(self, agency_group_id=None, agency_id=None, order_public_id=None, order_major_version=None, order_minor_version=None, user_id=None, seller_email=None, revision_due_date=None, comment=None):
+    def return_order_revision(self, agency_group_id=None, agency_id=None, user_id=None, campaign_id=None, order_id=None, version=None, revision=None,  seller_email=None, revision_due_date=None, comment=None):
         """
         "Return order revision" which means "Send a message back to the person who sent this revision"
 
@@ -811,25 +837,24 @@ class PATSBuyer(PATSAPIClient):
         if agency_group_id == None:
             agency_group_id = self.agency_group_id
         # TODO: allow attachments
-        # /agencies/{agency public id}/orders/{external public id}/revisions/return 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-App': 'prisma',
             'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': agency_id,
             'X-MO-User-ID': user_id
         }
+        # TODO: allow for list of emails
         data = {
-            'majorVersion': order_major_version,
-            'minorVersion': order_minor_version,
             'revisionDueBy': revision_due_date.strftime("%Y-%m-%d"),
             'comment': comment,
-            'email': seller_email,
+            'emails': [ seller_email ],
             'orderAttachments': [], # leave it blank for now
         }
         js = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,
-            "/agencies/%s/orders/%s/revisions/return" % (self.agency_id, order_public_id),
+            "/campaigns/%s/orders/%s/versions/%s/revisions/%s/return" % (campaign_id, order_id, version, revision),
             extra_headers,
             json.dumps(data)
         )
@@ -848,10 +873,12 @@ class PATSBuyer(PATSAPIClient):
             agency_id = self.agency_id
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-App': 'prisma',
             'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': agency_id,
             'X-MO-User-ID': user_id
         }
+        # TODO: allow for list of emails
         data = {
             'revisionDueBy': revision_due_date.strftime("%Y-%m-%d"),
             'comment': comment,
