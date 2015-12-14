@@ -581,7 +581,7 @@ class LineItemDigital(LineItem):
         #if self.packageType in ('Package', 'Roadblock', 'Child') and self.groupName == None:
         #    raise PATSException("Group Name required for package type %s" % self.packageType)
 
-    def dict_repr(self"):
+    def dict_repr(self):
         dict = super(LineItemDigital, self).dict_repr()
         dict.update({
             "parentExternalId": self.parentExternalId,

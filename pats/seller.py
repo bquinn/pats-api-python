@@ -498,7 +498,7 @@ class PATSSeller(PATSAPIClient):
         if user_id:
             extra_headers.update({
                 'X-MO-User-Id': user_id,
-                'X-MO-Organization-Id': vendor_id
+                'X-MO-Organization-Id': vendor_id,
                 'X-MO-Brand': 'pats'
             })
 
