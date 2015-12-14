@@ -281,92 +281,25 @@ class PATSSeller(PATSAPIClient):
                       "length":lengths_array,
                 })
 
-            # end standard attributes
-#                "customAttributes": "[{'customSection': 'placement section to decide product placement'}, {'comments': 'Draft version'}]"
-
         return self.save_product_data(data)
 
-    def get_agency_by_id(self, agency_id=None, user_id=None, name=None, last_updated_date=None):
-        """
-        As a seller, view detail about the specified agency.
-        BROKEN - bug no PATS-880
-
-        http://developer.mediaocean.com/docs/read/organization_api/Get_agency
-        """
-        #if agency_id == None:
-        #    raise PATSException("Agency ID is required")
-        #if user_id == None:
-        #    raise PATSException("User ID is required")
-
-        extra_headers = {
-            'Accept': 'application/vnd.mediaocean.security-v1+json',
-            'X-MO-User-ID': user_id
-        }
-        path = '/agencies'
-        if agency_id or last_updated_date or name:
-            path += '?'
-        if agency_id:
-            path += 'agencyId=%s&' % agency_id 
-        if last_updated_date:
-            path += "lastUpdatedDate=%s&" % last_updated_date
-        if name:
-            path += "name=%s" % name
-        js = self._send_request(
-            "GET",
-            PUBLISHER_API_DOMAIN,
-            path,
-            extra_headers
-        )
-        # TODO: Parse the response and return something more intelligible
-        return js
-
-    def get_agency_by_name(self, agency_name=None, user_id=None, last_updated_date=None):
-        """
-        As a seller, view detail about the specified agency.
-        BROKEN - bug no PATS-880
-
-        http://developer.mediaocean.com/docs/read/organization_api/Get_agency
-        """
-        if agency_name == None:
-            raise PATSException("Agency name string is required")
-        if user_id == None:
-            raise PATSException("User ID is required")
-
-        extra_headers = {
-            'Accept': 'application/vnd.mediaocean.security-v1+json',
-            'X-MO-User-ID': user_id
-        }
-        path = '/agencies?name=%s' % agency_name
-        js = self._send_request(
-            "GET",
-            PUBLISHER_API_DOMAIN,
-            path,
-            extra_headers
-        )
-        # TODO: Parse the response and return something more intelligible
-        return js
-
-    def view_orders(self, start_date=None, end_date=None):
+    def list_orders(self, since_date=None, page_size=25, page=1):
         """
         As a seller, view all orders that are available to me.
 
-        http://developer.mediaocean.com/docs/read/publisher_orders_api/Publisher_list_order_summary
+        http://developer.mediaocean.com/docs/read/seller_orders/Find_orders_seller
         """
-        if start_date == None:
-            raise PATSException("Start date is required")
+        if since_date == None:
+            raise PATSException("Since date is required")
 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
-            'X-MO-User-ID': self.user_id
+            'X-MO-Organization-Id': self.vendor_id,
+            'X-MO-User-Id': self.user_id,
+            'X-MO-App': 'pats'
         }
 
-        path = '/vendors/%s/orders' % self.vendor_id
-        if start_date and end_date:
-            # not sure if you can have one or the other on its own?
-            path += "?startDate=%s&endDate=%s" % (
-                start_date.strftime("%Y-%m-%d"),
-                end_date.strftime("%Y-%m-%d")
-            )
+        path = '/orders?since=%s&size=%s&page=%s' % (since_date.strftime("%Y-%m-%d"), page_size, page)
         js = self._send_request(
             "GET",
             PUBLISHER_API_DOMAIN,
@@ -376,27 +309,74 @@ class PATSSeller(PATSAPIClient):
         # TODO: Parse the response and return something more intelligible
         return js
 
-    def view_order_detail(self, order_id=None, version=None):
+    def list_all_orders(self, since_date=None):
         """
-        As a seller, view detail of a particular (major) version of an order.
+        Loop over the list_orders method until we definitely have all orders in an array
+        """
+        page_size = 25
+        page = 1
+        full_json_list = []
+        remaining_content = True 
+        while (remaining_content):
+            partial_json_list = self.list_orders(since_date, page_size=page_size, page=page)
+            full_json_list.extend(partial_json_list)
+            page = page + 1
+            remaining_content = (len(partial_json_list) == page_size)
 
-        http://developer.mediaocean.com/docs/read/publisher_orders_api/Get_order_detail_by_version
+        return full_json_list
+
+    def list_order_versions(self, campaign_id=None, order_id=None, user_id=None, vendor_id=None):
         """
+        As a seller, view a list of all versions of an order
+        http://developer.mediaocean.com/docs/seller_orders/List_order_versions_seller
+        """
+        if campaign_id == None:
+            raise PATSException("Campaign ID is required")
         if order_id == None:
-            raise PATSException("order ID is required")
-        if version == None:
-            raise PATSException("version is required")
+            raise PATSException("Order ID is required")
+        if user_id == None:
+            user_id = self.user_id
+        if vendor_id == None:
+            vendor_id = self.vendor_id
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
-            'X-MO-User-Id': self.user_id
+            'X-MO-Organization-Id': vendor_id,
+            'X-MO-User-Id': self.user_id,
+            'X-MO-App': 'pats'
         }
         js = self._send_request(
             "GET",
             PUBLISHER_API_DOMAIN,
-            '/vendors/%s/orders/%s?version=%s' % (self.vendor_id, order_id, version),
+            '/orders/%s/versions' % order_id,
             extra_headers
         )
-        # TODO: Parse the response and return something more intelligible
+        return js
+
+    def view_order_version_detail(self, campaign_id=None, order_id=None, version=None):
+        """
+        As a seller, view detail of a particular (major) version of an order.
+
+        http://developer.mediaocean.com/docs/read/seller_orders/Get_order_version_details_seller
+        """
+        if campaign_id == None:
+            raise PATSException("Campaign ID is required")
+        if order_id == None:
+            raise PATSException("Order ID is required")
+        if version == None:
+            raise PATSException("Version is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-Organization-Id': self.vendor_id,
+            'X-MO-User-Id': self.user_id,
+            'X-MO-App': 'pats'
+        }
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            #'/vendors/%s/orders/%s?version=%s' % (self.vendor_id, order_id, version),
+            '/orders/%s/versions/%s' % (order_id, version),
+            extra_headers
+        )
         return js
 
     def view_revision_status_summary(self, user_id=None, order_id=None):
@@ -439,23 +419,23 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
-    def view_order_history(self, order_id=None, full=False):
+    def view_order_events(self, order_id=None):
         """
-        As a seller, view the history (ie all old versions) of an order.
+        As a seller, view the event history (ie all changes) of an order.
 
         full (True/False): if True, returns the complete order history including all line items for each version.
 
-        http://developer.mediaocean.com/docs/read/publisher_orders_api/Publisher_get_order_history
+        http://developer.mediaocean.com/docs/read/seller_orders/Get_order_events_seller
         """
         if order_id == None:
             raise PATSException("order ID is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
-            'X-MO-User-ID': self.user_id
+            'X-MO-Organization-Id': self.vendor_id,
+            'X-MO-User-ID': self.user_id,
+            'X-MO-App': 'pats'
         }
-        path = '/vendors/%s/orders/%s/history' % (self.vendor_id, order_id)
-        if full:
-            path += "?full=true"
+        path = '/orders/%s/events' % order_id
         js = self._send_request(
             "GET",
             PUBLISHER_API_DOMAIN,
@@ -482,21 +462,21 @@ class PATSSeller(PATSAPIClient):
         digital_line_items_obj = []
         if digital_line_items:
             for line_item in digital_line_items:
-                digital_line_items_obj.append(line_item.dict_repr(mode="seller"))
+                digital_line_items_obj.append(line_item.dict_repr())
             data.update({
                 "digitalLineItems": digital_line_items_obj
             })
         print_line_items_obj = []
         if print_line_items:
             for line_item in print_line_items:
-                print_line_items_obj.append(line_item.dict_repr(mode="seller"))
+                print_line_items_obj.append(line_item.dict_repr())
             data.update({
                 "printLineItems": print_line_items_obj
             })
 
         return self.send_order_revision_raw(order_id=order_id, user_id=user_id, data=data)
 
-    def send_order_revision_raw(self, vendor_id=None, order_id=None, user_id=None, data=None):
+    def send_order_revision_raw(self, vendor_id=None, order_id=None, version=None, user_id=None, data=None):
         """
         Send a revision (ie a proposed new version) of an order back to the buyer.
         Must always be in response to a sent order.
@@ -506,7 +486,7 @@ class PATSSeller(PATSAPIClient):
         user_id (optional): the PATS username for the user sending the revision.
         data: raw payload of order contents, including line items.
 
-        http://developer.mediaocean.com/docs/read/publisher_orders_api/Submit_order_revision
+        http://developer.mediaocean.com/docs/read/seller_orders/Send_order_revision_seller
         """
         if vendor_id==None:
             vendor_id=self.vendor_id # default but can be overridden
@@ -518,11 +498,11 @@ class PATSSeller(PATSAPIClient):
         if user_id:
             extra_headers.update({
                 'X-MO-User-Id': user_id,
-                # This is supposed to be optional but it fails if not provided
+                'X-MO-Organization-Id': vendor_id
                 'X-MO-Brand': 'pats'
             })
 
-        path = '/vendors/%s/orders/%s/revisions' % (vendor_id, order_id)
+        path = '/orders/%s/versions/%s/revisions?operation=send' % (order_id, version)
 
         # send request
         js = self._send_request(

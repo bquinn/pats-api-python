@@ -417,7 +417,7 @@ class LineItem(JSONSerializable):
         self.supplierPlacementParentReference = self.getvar('supplierPlacementParentReference', None, args, kwargs)
         self.mediaProperty = self.getvar('mediaProperty', None, args, kwargs)
 
-    def dict_repr(self, mode="buyer"):
+    def dict_repr(self):
         dict = {
             "externalId": self.externalId,
             "referenceId": self.referenceId,
@@ -431,7 +431,8 @@ class LineItem(JSONSerializable):
             "units": self.units,
             "costMethod": self.costMethod,
             "rate": "{0:.4f}".format(self.rate),
-            "cost": "{0:.4f}".format(self.cost),
+            # "cost": "{0:.4f}".format(self.cost),
+            "cost": "{0:.2f}".format(self.cost),
             "comments": self.comments,
             "campaignId": self.campaignId,
             "supplierPlacementParentReference": self.supplierPlacementParentReference,
@@ -497,8 +498,8 @@ class LineItemPrint(LineItem):
         #if self.unitType == "Insert" and self.buyCategory != "Inserts":
         #    raise PATSException("For unitType Insert, buyCategory %s is not valid (must be Inserts)." % self.buyCategory)
 
-    def dict_repr(self, mode="buyer"):
-        dict = super(LineItemPrint, self).dict_repr(mode)
+    def dict_repr(self):
+        dict = super(LineItemPrint, self).dict_repr()
         # in 2015.7, "color" "position" "size" moved to outside printInsertion
         # (for sellers at least)
         dict.update({
@@ -531,8 +532,8 @@ class LineItemDigital(LineItem):
     flightEndDate = None
     flighting = None # [ { month, year, units }]
 
-   # for validation
-    # see http://developer.mediaocean.com/docs/read/publisher_orders_api/Order_API_seller_reference_data
+    # for validation
+    # see http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#buy_categories
     possible_buy_categories_digital = [
         'Fee - Ad Serving', 'Fee - Ad Verification', 'Fee - Data', 'Fee - Mobile',
         'Fee - Privacy Icon', 'Fee - Production', 'Fee - Research', 'Fee - Search',
@@ -540,16 +541,16 @@ class LineItemDigital(LineItem):
         'Fee - Other',
         # confusion - buyer-side has "Display" and seller side has "Display Standard"
         # among other differences...
-        'Display', 'Display Standard', 'Rich Media', 'Mobile', 'Video',
+        'Standard', 'RichMedia', 'Mobile', 'Video',
         'Package','Roadblock', 'Interstitial','In-Game',
         'Social', 'Sponsorship', 'Tablet', 'Text',
         'Custom-Other'
     ]
-    #possible_servedby = [
-    #    'Site',
-    #    '3rd party',
-    #    'Other'
-    #]
+    possible_servedby = [
+        'Site',
+        '3rd party',
+        'Other'
+    ]
 
     possible_packagetype = [
         'Package',
@@ -572,16 +573,16 @@ class LineItemDigital(LineItem):
         self.flighting = self.getvar('flighting', '', args, kwargs)
 
         # validation
-        #if self.servedBy not in self.possible_servedby:
-        #    raise PATSException("servedBy %s not valid." % self.servedBy)
-#        if self.buyCategory not in self.possible_buy_categories_digital and self.packageType != "Package":
-#            raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        if self.servedBy not in self.possible_servedby:
+            raise PATSException("servedBy %s not valid." % self.servedBy)
+        if self.buyCategory not in self.possible_buy_categories_digital and self.packageType != "Package":
+            raise PATSException("Buy Category %s not valid." % self.buyCategory)
         # We have groupName for revisions but packageName for proposals...
         #if self.packageType in ('Package', 'Roadblock', 'Child') and self.groupName == None:
         #    raise PATSException("Group Name required for package type %s" % self.packageType)
 
-    def dict_repr(self, mode="buyer"):
-        dict = super(LineItemDigital, self).dict_repr(mode)
+    def dict_repr(self"):
+        dict = super(LineItemDigital, self).dict_repr()
         dict.update({
             "parentExternalId": self.parentExternalId,
             "primaryPlacement": self.primaryPlacement,

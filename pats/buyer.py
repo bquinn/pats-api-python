@@ -45,14 +45,16 @@ AGENCY_API_DOMAIN = 'prisma-demo.api.mediaocean.com'
 class PATSBuyer(PATSAPIClient):
     agency_id = None
     agency_group_id = None
+    user_id = None
 
-    def __init__(self, agency_id=None, agency_group_id=None, api_key=None, debug_mode=False, raw_mode=False, session=None):
+    def __init__(self, agency_id=None, agency_group_id=None, user_id=None, api_key=None, debug_mode=False, raw_mode=False, session=None):
         """
         Create a new buyer-side PATS API object.
 
         Parameters:
         - agency_id (required) : ID of the agency (buyer) who your buy-side call represents.
         - agency_group_id (required) : ID of the agency (buyer) group.
+        - user_id (optional) : User ID of the buyer user.
         - api_key (required) : API Key with buyer access
         - debug_mode (boolean) : Output full details of HTTP requests and responses
         - raw_mode (boolean) : Store output of request (as 'curl' equivalent) and
@@ -64,6 +66,7 @@ class PATSBuyer(PATSAPIClient):
             raise PATSException("Agency (aka buyer) ID is required")
         self.agency_id = agency_id
         self.agency_group_id = agency_group_id
+        self.user_id = user_id
 
     def get_sellers(self, user_id=None):
         """
@@ -71,7 +74,7 @@ class PATSBuyer(PATSAPIClient):
         http://developer.mediaocean.com/docs/read/organization_api/Get_seller_organization
         """
         if user_id == None:
-            raise PATSException("User ID is required")
+            user_id = self.user_id
 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.security-v1+json',
@@ -92,7 +95,7 @@ class PATSBuyer(PATSAPIClient):
         http://developer.mediaocean.com/docs/read/organization_api/Get_agency
         """
         if user_id == None:
-            raise PATSException("User ID is required")
+            user_id = self.user_id
         if agency_id == None:
             # use default agency ID if none specified
             agency_id = self.agency_id
@@ -121,7 +124,7 @@ class PATSBuyer(PATSAPIClient):
         http://developer.mediaocean.com/docs/read/organization_api/Get_user
         """
         if user_id == None:
-            raise PATSException("User ID is required")
+            user_id = self.user_id
         if vendor_id == None:
             raise PATSException("Vendor ID is required")
         extra_headers = {
@@ -138,7 +141,7 @@ class PATSBuyer(PATSAPIClient):
         # TODO: Parse the response and return something more intelligible
         return js
 
-    def create_campaign(self, campaign_details=None, **kwargs):
+    def create_campaign(self, campaign_details=None, user_id=None, **kwargs):
         """
         Create an agency-side campaign, which is then used to send RFPs and orders.
         "campaign_details" must be a CampaignDetails instance.
@@ -149,18 +152,17 @@ class PATSBuyer(PATSAPIClient):
                 "The campaign_details parameter should be a CampaignDetails instance"
             )
 
+        if campaign_details.user_id:
+            user_id = campaign_details.user_id
         organisation_id = campaign_details.organisation_id or self.agency_id
         # Create the http object
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.prisma-v1+json',
             'X-MO-App': 'prisma',
             'X-MO-Agency-Group-ID': self.agency_group_id,
-            'X-MO-Organization-ID': organisation_id
+            'X-MO-Organization-ID': organisation_id,
+            'X-MO-User-ID': user_id
         }
-        if campaign_details.user_id:
-            extra_headers.update({
-                'X-MO-User-ID': campaign_details.user_id,
-            })
         campaign_uri = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,
@@ -212,6 +214,8 @@ class PATSBuyer(PATSAPIClient):
             agency_group_id = self.agency_group_id
         if agency_id is None:
             agency_id = self.agency_id
+        if user_id is None:
+            user_id = self.user_id
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.prisma-v1+json',
             'X-MO-User-ID': user_id,
@@ -291,15 +295,15 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def view_rfp_detail(self, agency_group_id=None, agency_id=None, sender_user_id=None, rfp_id=None):
+    def view_rfp_detail(self, agency_group_id=None, agency_id=None, user_id=None, rfp_id=None):
         """
         Get a single RFP using its public ID.
         http://developer.mediaocean.com/docs/read/rfp_api/Get_rfp_by_publicid
         """
         if rfp_id is None:
             raise PATSException("RFP ID is required")
-        if sender_user_id is None:
-            raise PATSException("Sender User ID is required")
+        if user_id == None:
+            user_id = self.user_id
         if agency_group_id is None:
             agency_group_id = self.agency_group_id
         if agency_id is None:
@@ -308,7 +312,7 @@ class PATSBuyer(PATSAPIClient):
             'Accept': 'application/vnd.mediaocean.rfps-v3+json',
             'X-MO-Organization-ID': agency_id,
             'X-MO-Agency-Group-ID': agency_group_id,
-            'X-MO-User-Id': sender_user_id
+            'X-MO-User-Id': user_id
         }
         js = self._send_request(
             "GET",
@@ -342,7 +346,7 @@ class PATSBuyer(PATSAPIClient):
         """
         # /agencies/35-1-1W-1/rfps?advertiserName=Jaguar Land Rover&campaignUrn=someUrn&rfpStartDate=2014-08-10&rfpEndDate=2015-01-10&responseDueDate=2015-08-25&status=SENT
         if user_id is None:
-            raise PATSException("User ID is required")
+            user_id = self.user_id
         if agency_id is None:
             agency_id = self.agency_id
         if agency_group_id is None:
@@ -451,7 +455,7 @@ class PATSBuyer(PATSAPIClient):
         if vendor_id is None:
             raise PATSException("Vendor ID is required")
         if user_id is None:
-            raise PATSException("User ID is required")
+            user_id = self.user_id
 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.catalog-v1+json',
@@ -477,7 +481,7 @@ class PATSBuyer(PATSAPIClient):
         # {"total":117,"products":[{"vendorPublicId":"35-EEBMG4J-4","productPublicId":"PC-11TU", ... }
         return js
 
-    def create_order(self, agency_id=None, agency_group_id=None, user_id=None, digital_line_items=None, print_line_items=None, **kwargs):
+    def create_order(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, media_type=None, currency_code=None, external_order_id=None, vendor_id=None, recipient_emails=None, buyer_dict=None, notify_emails=None, additional_info=None, order_comment=None, respond_by_date=None, terms_and_conditions_name=None, terms_and_conditions_content=None, digital_line_items=None, print_line_items=None, **kwargs):
         """
         Create a print or digital order in PATS.
         agency_id: PATS ID of the buying agency (eg 35-IDSDKAD-7)
@@ -485,6 +489,7 @@ class PATSBuyer(PATSAPIClient):
         user_id: (optional?) PATS ID of the person sending the order (different
             from the person named as the buyer contact in the order)
         media_type: Either 'Print' or 'Online'
+        campaign_id: campaign to which to attach this order
         digital_line_items: object inserted as "line_items" in the order
         print_line_items: object inserted as "line_items" in the order
 
@@ -498,33 +503,15 @@ class PATSBuyer(PATSAPIClient):
             agency_group_id = self.agency_group_id
         if user_id == None:
             user_id = kwargs.get('user_id', None)
-        media_type = kwargs.get('media_type', 'PRINT')
-        order_currency_code = kwargs.get('order_currency_code', 'PRINT')
-        external_order_id = kwargs.get('external_order_id', None)
-        vendor_id = kwargs.get('vendor_id', None)
-        recipient_emails = kwargs.get('recipient_emails', None)
-        buyer_first_name = kwargs.get('buyer_first_name', '')
-        buyer_last_name = kwargs.get('buyer_last_name', '')
-        buyer_email = kwargs.get('buyer_email', '')
-        notify_emails = kwargs.get('notify_emails', [])
-        additional_info = kwargs.get('additional_info', '')
-        order_comment = kwargs.get('order_comment', '')
-        respond_by_date = kwargs.get('respond_by_date', None)
-        terms_and_conditions_name = kwargs.get('terms_and_conditions_name', None)
-        terms_and_conditions_content = kwargs.get('terms_and_conditions_content', None)
 
         # order payload
         data = {
             "externalId": external_order_id,
             "mediaType": media_type,
-            "currencyCode": order_currency_code,
+            "currencyCode": currency_code,
             "vendorId": vendor_id,
             "recipientEmails": recipient_emails,
-            "buyer": {
-                "firstName": buyer_first_name,
-                "lastName": buyer_last_name,
-                "email": buyer_email
-            },
+            "buyer": buyer_dict,
             "notifyEmails": notify_emails,
             "additionalInfo": additional_info,
             "comment": order_comment,
@@ -535,20 +522,20 @@ class PATSBuyer(PATSAPIClient):
             }
         }
         # technically line items are optional!
-        if kwargs.get('line_items'):
-            line_items = []
-            for line_item in kwargs['line_items']:
+        line_items = []
+        if media_type == 'Online':
+            for line_item in digital_line_items:
                 line_items.append(line_item.dict_repr())
-            if media_type == 'Online':
-                data.update({
-                    'digitalLineItems':line_items
-                })
-            else:
-                data.update({
-                    'printLineItems':line_items
-                })
-
-        return self.create_order_raw(agency_id=agency_id, agency_group_id=agency_group_id, user_id=user_id, data=data)
+            data.update({
+                'digitalLineItems':line_items
+            })
+        else:
+            for line_item in print_line_items:
+                line_items.append(line_item.dict_repr())
+            data.update({
+                'printLineItems':line_items
+            })
+        return self.create_order_raw(agency_id=agency_id, agency_group_id=agency_group_id, user_id=user_id, campaign_id=campaign_id, data=data)
 
     def create_order_raw(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, data=None):
         """
@@ -571,7 +558,7 @@ class PATSBuyer(PATSAPIClient):
         if campaign_id==None:
             raise PATSException("Campaign ID is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
             'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': agency_id,
             'X-MO-App': 'prisma'
@@ -581,17 +568,21 @@ class PATSBuyer(PATSAPIClient):
                 'X-MO-User-ID': user_id
             })
 
-        # send request
-        js = self._send_request(
-            "PUT",
+        # send request - as it returns 201 Created on success, _send_request parses out the Location header and returns the full location
+        order_uri = self._send_request(
+            "POST",
             AGENCY_API_DOMAIN,
-            "/order/send",
+            "/campaigns/%s/orders" % campaign_id,
             extra_headers,
             json.dumps(data)
         )
-        return js
+        match = re.search('https?://(.+)?/campaigns/(.+?)/orders/(.+?)/versions/0$', order_uri)
+        order_id = None
+        if match:
+            order_id = match.group(3)
+        return order_id
 
-    def view_orders(self, agency_id=None, agency_group_id=None, user_id=None, since_date=None):
+    def list_orders(self, agency_id=None, agency_group_id=None, user_id=None, since_date=None, page_size=50, page=1):
         """
         Retrieve a list of all orders booked since "since_date" (new in 2015.8)
         """
@@ -604,8 +595,8 @@ class PATSBuyer(PATSAPIClient):
         if agency_id == None:
             agency_id = self.agency_id
         if user_id == None:
-            raise PATSException("User ID is required")
-        path = '/orders?since=%s' % since_date.strftime("%Y-%m-%d")
+            user_id = self.user_id
+        path = '/orders?since=%s&size=%s&page=%s' % (since_date.strftime("%Y-%m-%d"), page_size, page)
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
             'X-MO-App': 'prisma',
@@ -626,6 +617,22 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
+    def list_all_orders(self, since_date=None):
+        """
+        Loop over the list_orders method until we definitely have all orders in an array
+        """
+        page_size = 25
+        page = 1
+        full_json_list = []
+        remaining_content = True
+        while (remaining_content):
+            partial_json_list = self.list_orders(since_date, page_size=page_size, page=page)
+            full_json_list.extend(partial_json_list)
+            page = page + 1
+            remaining_content = (len(partial_json_list) == page_size)
+
+        return full_json_list
+
     def view_order_revisions(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, order_id=None, version=None):
         """
         As a buyer, view all revisions on a given order version.
@@ -638,7 +645,7 @@ class PATSBuyer(PATSAPIClient):
         if agency_id == None:
             agency_id = self.agency_id
         if user_id == None:
-            raise PATSException("User ID is required")
+            user_id = self.user_id
 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
@@ -657,14 +664,14 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def view_order_versions(self, user_id=None, agency_id=None, agency_group_id=None, campaign_id=None, order_id=None):
+    def list_order_versions(self, user_id=None, agency_id=None, agency_group_id=None, campaign_id=None, order_id=None):
         """
         As a buyer, list versions of an order.
 
         http://developer.mediaocean.com/docs/buyer_orders/List_order_versions_buyer
         """
         if user_id == None:
-            raise PATSException("User ID is required")
+            user_id = self.user_id
         if campaign_id == None:
             raise PATSException("Campaign ID is required")
         if order_id == None:
@@ -690,22 +697,19 @@ class PATSBuyer(PATSAPIClient):
         return js
 
 
-    def view_order_version_detail(self, user_id=None, agency_id=None, agency_group_id=None, campaign_id=None, order_id=None, order_version=None):
+    def view_order_version_detail(self, user_id=None, agency_id=None, agency_group_id=None, campaign_id=None, order_id=None, version=None):
         """
         As a buyer, view the detail of one order version.
 
-        was based on
-        http://developer.mediaocean.com/docs/read/orders_api/Get_order_detail
-        but is now changed to
         http://developer.mediaocean.com/docs/buyer_orders/Get_order_version_details_buyer
         """
         if user_id == None:
-            raise PATSException("User ID is required")
+            user_id = self.user_id
         if campaign_id == None:
             raise PATSException("Campaign ID is required")
         if order_id == None:
             raise PATSException("Order ID is required")
-        if order_version == None:
+        if version == None:
             raise PATSException("Order version is required")
         if agency_group_id == None:
             agency_group_id = self.agency_group_id
@@ -722,24 +726,24 @@ class PATSBuyer(PATSAPIClient):
         js = self._send_request(
             "GET",
             AGENCY_API_DOMAIN,
-            "/campaigns/%s/orders/%s/versions/%s" % (campaign_id, order_id, order_version),
+            "/campaigns/%s/orders/%s/versions/%s" % (campaign_id, order_id, version),
             extra_headers
         )
         return js
 
-    def view_order_revision_detail(self, user_id=None, agency_id=None, agency_group_id=None, campaign_id=None, order_id=None, order_version=None, order_revision=None):
+    def view_order_revision_detail(self, user_id=None, agency_id=None, agency_group_id=None, campaign_id=None, order_id=None, version=None, revision=None):
         """
         As a buyer, view the detail of one order revision.
 
         http://developer.mediaocean.com/docs/buyer_orders/Get_order_rev_details_buyer
         """
         if user_id == None:
-            raise PATSException("User ID is required")
+            user_id = self.user_id
         if campaign_id == None:
             raise PATSException("Campaign ID is required")
         if order_id == None:
             raise PATSException("Order ID is required")
-        if order_version == None:
+        if version == None:
             raise PATSException("Order version is required")
         if order_revision == None:
             raise PATSException("Order revision is required")
@@ -758,43 +762,44 @@ class PATSBuyer(PATSAPIClient):
         js = self._send_request(
             "GET",
             AGENCY_API_DOMAIN,
-            "/campaigns/%s/orders/%s/versions/%s/revisions/%s" % (campaign_id, order_id, order_version, order_revision),
+            "/campaigns/%s/orders/%s/versions/%s/revisions/%s" % (campaign_id, order_id, version, revision),
             extra_headers
         )
         return js
 
-    def view_order_status(self, user_id=None, agency_group_id=None, campaign_id=None, order_id=None, version=None):
-        """
-        As a buyer, view the status of an order I have just sent.
-
-        http://developer.mediaocean.com/docs/read/orders_api/Get_order_status
-        """
-        # /order/status/{externalCampaignId}/{orderId}/{version}
-        if agency_group_id == None:
-            agency_group_id = self.agency_group_id
-        if campaign_id == None:
-            raise PATSException("Campaign ID is required")
-        if order_id == None:
-            raise PATSException("Order ID is required")
-        extra_headers = {
-            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
-            'X-MO-Agency-Group-ID': agency_group_id,
-            'X-MO-Organization-ID': self.agency_id
-        }
-        if user_id:
-            extra_headers.update({
-                'X-MO-User-ID': user_id,
-            })
-        path = "/order/status/%s/%s" % (campaign_id, order_id)
-        if version:
-            path += "/"+version
-        js = self._send_request(
-            "GET",
-            AGENCY_API_DOMAIN,
-            path,
-            extra_headers
-        )
-        return js
+# Deprecated in 2015.8
+#    def view_order_status(self, user_id=None, agency_group_id=None, campaign_id=None, order_id=None, version=None):
+#        """
+#        As a buyer, view the status of an order I have just sent.
+#
+#        http://developer.mediaocean.com/docs/read/orders_api/Get_order_status
+#        """
+#        # /order/status/{externalCampaignId}/{orderId}/{version}
+#        if agency_group_id == None:
+#            agency_group_id = self.agency_group_id
+#        if campaign_id == None:
+#            raise PATSException("Campaign ID is required")
+#        if order_id == None:
+#            raise PATSException("Order ID is required")
+#        extra_headers = {
+#            'Accept': 'application/vnd.mediaocean.prisma-v1.0+json',
+#            'X-MO-Agency-Group-ID': agency_group_id,
+#            'X-MO-Organization-ID': self.agency_id
+#        }
+#        if user_id:
+#            extra_headers.update({
+#                'X-MO-User-ID': user_id,
+#            })
+#        path = "/order/status/%s/%s" % (campaign_id, order_id)
+#        if version:
+#            path += "/"+version
+#        js = self._send_request(
+#            "GET",
+#            AGENCY_API_DOMAIN,
+#            path,
+#            extra_headers
+#        )
+#        return js
 
     def get_order_attachment(self, user_id=None, agency_group_id=None, agency_id=None, campaign_id=None, order_id=None, attachment_id=None):
         """
@@ -808,7 +813,7 @@ class PATSBuyer(PATSAPIClient):
         if campaign_id == None:
             raise PATSException("Campaign ID is required")
         if user_id == None:
-            raise PATSException("User ID is required")
+            user_id = self.user_id
         if order_id == None:
             raise PATSException("Order ID is required")
         extra_headers = {
