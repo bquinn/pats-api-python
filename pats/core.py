@@ -420,7 +420,6 @@ class LineItem(JSONSerializable):
     def dict_repr(self):
         dict = {
             "externalId": self.externalId,
-            "referenceId": self.referenceId,
             "name": self.name,
             "buyType": self.buyType,
             "buyCategory": self.buyCategory,
@@ -431,7 +430,6 @@ class LineItem(JSONSerializable):
             "units": self.units,
             "costMethod": self.costMethod,
             "rate": "{0:.4f}".format(self.rate),
-            # "cost": "{0:.4f}".format(self.cost),
             "cost": "{0:.2f}".format(self.cost),
             "comments": self.comments,
             "campaignId": self.campaignId,
@@ -445,6 +443,10 @@ class LineItem(JSONSerializable):
         if self.lineNumber:
             dict.update({
                 "lineNumber": self.lineNumber,
+            })
+        if self.referenceId:
+            dict.update({
+                "referenceId": self.referenceId,
             })
         return dict
 
@@ -535,10 +537,10 @@ class LineItemDigital(LineItem):
     # for validation
     # see http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#buy_categories
     possible_buy_categories_digital = [
-        'Fee - Ad Serving', 'Fee - Ad Verification', 'Fee - Data', 'Fee - Mobile',
-        'Fee - Privacy Icon', 'Fee - Production', 'Fee - Research', 'Fee - Search',
-        'Fee - Sponsorship', 'Fee - Tax', 'Fee - Technology', 'Fee - Viewability',
-        'Fee - Other',
+        'Ad Serving', 'Ad Verification', 'Data', 'Mobile',
+        'Privacy Icon', 'Production', 'Research', 'Search',
+        'Sponsorship', 'Tax', 'Technology', 'Viewability',
+        'Other',
         # confusion - buyer-side has "Display" and seller side has "Display Standard"
         # among other differences...
         'Standard', 'RichMedia', 'Mobile', 'Video',
@@ -552,11 +554,18 @@ class LineItemDigital(LineItem):
         'Other'
     ]
 
-    possible_packagetype = [
+    possible_package_types = [
         'Package',
         'Roadblock',
         'Child',
         'Standalone'
+    ]
+
+    possible_creative_types = [
+        'GIF',
+        'Flash',
+        'Rich Media',
+        'Other'
     ]
     def __init__(self, *args, **kwargs):
         super(LineItemDigital, self).__init__(*args, **kwargs)
@@ -570,13 +579,15 @@ class LineItemDigital(LineItem):
         self.servedBy = self.getvar('servedBy', None, args, kwargs)
         self.target = self.getvar('target', None, args, kwargs)
         self.creativeType = self.getvar('creativeType', None, args, kwargs)
-        self.flighting = self.getvar('flighting', '', args, kwargs)
+        self.flighting = self.getvar('flighting', None, args, kwargs)
 
         # validation
         if self.servedBy not in self.possible_servedby:
             raise PATSException("servedBy %s not valid." % self.servedBy)
         if self.buyCategory not in self.possible_buy_categories_digital and self.packageType != "Package":
             raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        if self.creativeType not in self.possible_creative_types and self.packageType != "Package":
+            raise PATSException("creativeType %s not valid." % self.creativeType)
         # We have groupName for revisions but packageName for proposals...
         #if self.packageType in ('Package', 'Roadblock', 'Child') and self.groupName == None:
         #    raise PATSException("Group Name required for package type %s" % self.packageType)
@@ -584,7 +595,6 @@ class LineItemDigital(LineItem):
     def dict_repr(self):
         dict = super(LineItemDigital, self).dict_repr()
         dict.update({
-            "parentExternalId": self.parentExternalId,
             "primaryPlacement": self.primaryPlacement,
             "dimensions": self.dimensions,
             "position": self.position,
@@ -593,8 +603,15 @@ class LineItemDigital(LineItem):
             "servedBy": self.servedBy,
             "flightStartDate": self.flightStartDate.strftime("%Y-%m-%d"),
             "flightEndDate": self.flightEndDate.strftime("%Y-%m-%d"),
-            "flighting": self.flighting
         })
+        if self.parentExternalId:
+            dict.update({
+                "parentExternalId": self.parentExternalId
+            })
+        if self.flighting:
+            dict.update({
+                "flighting": self.flighting
+            })
         return dict
 
 class InsertionOrderLineItemDigital(LineItemDigital):
