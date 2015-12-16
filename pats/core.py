@@ -424,21 +424,21 @@ class LineItem(JSONSerializable):
             "buyType": self.buyType,
             "buyCategory": self.buyCategory,
             "packageType": self.packageType,
-            "section": self.section,
-            "subsection": self.subsection,
             "unitType": self.unitType,
             "units": self.units,
             "costMethod": self.costMethod,
-            "rate": "{0:.4f}".format(self.rate),
             "cost": "{0:.2f}".format(self.cost),
             "comments": self.comments,
-            "campaignId": self.campaignId,
             "supplierPlacementParentReference": self.supplierPlacementParentReference,
             "mediaProperty": self.mediaProperty
         }
         if self.id:
             dict.update({
                 "id": self.id
+            })
+        if self.campaignId:
+            dict.update({
+                "campaignId": self.campaignId
             })
         if self.lineNumber:
             dict.update({
@@ -447,6 +447,12 @@ class LineItem(JSONSerializable):
         if self.referenceId:
             dict.update({
                 "referenceId": self.referenceId,
+            })
+        if self.buyType != "Print Fee":
+            dict.update({
+                "rate": "{0:.4f}".format(self.rate),
+                "section": self.section,
+                "subsection": self.subsection
             })
         return dict
 
@@ -464,7 +470,7 @@ class LineItemPrint(LineItem):
     size_columns = None # number of columns, eg for 25 x 4 would be 4
     # }
 
-    publication = None # duplicates mediaProperty?
+    # publication = None # duplicates mediaProperty?
     positionGuaranteed = None # optional - must be true or false
     includeInDigitalEdition = None # optional - must be true or false
 
@@ -482,7 +488,7 @@ class LineItemPrint(LineItem):
 
     def __init__(self, *args, **kwargs):
         super(LineItemPrint, self).__init__(*args, **kwargs)
-        self.publication = self.getvar('publication', '', args, kwargs)
+        # self.publication = self.getvar('publication', '', args, kwargs)
         self.size_type = self.getvar('size_type', '', args, kwargs)
         self.size_units = self.getvar('size_units', '', args, kwargs)
         self.size_columns = self.getvar('size_columns', '', args, kwargs)
@@ -495,30 +501,30 @@ class LineItemPrint(LineItem):
         self.includeInDigitalEdition = self.getvar('includeInDigitalEdition', False, args, kwargs)
 
         # validation
-        #if self.buyCategory not in self.possible_buy_categories_print:
-        #    raise PATSException("Buy Category %s not valid." % self.buyCategory)
+        if self.buyCategory not in self.possible_buy_categories_print:
+            raise PATSException("Placement %s: Buy Category %s not valid." % (self.name, self.buyCategory))
         #if self.unitType == "Insert" and self.buyCategory != "Inserts":
         #    raise PATSException("For unitType Insert, buyCategory %s is not valid (must be Inserts)." % self.buyCategory)
 
     def dict_repr(self):
         dict = super(LineItemPrint, self).dict_repr()
-        # in 2015.7, "color" "position" "size" moved to outside printInsertion
-        # (for sellers at least)
         dict.update({
-            'publication': self.publication,
-            'color': self.color,
             'coverDate': self.coverDate.strftime("%Y-%m-%d"),
-            'saleDate': self.saleDate.strftime("%Y-%m-%d"),
-            'position': self.position,
-            'region': self.region,
-            'positionGuaranteed': self.positionGuaranteed,
-            'includeInDigitalEdition': self.includeInDigitalEdition,
-            'size' : {
-                'type': self.size_type,
-                'units': self.size_units,
-                'columns': self.size_columns
-            }
         })
+        if self.buyType != "Print Fee":
+            dict.update({
+                'color': self.color,
+                'saleDate': self.saleDate.strftime("%Y-%m-%d"),
+                'size' : {
+                    'type': self.size_type,
+                    'units': self.size_units,
+                    'columns': self.size_columns
+                },
+                'positionGuaranteed': self.positionGuaranteed,
+                'includeInDigitalEdition': self.includeInDigitalEdition,
+                'position': self.position,
+                'region': self.region
+            })
         return dict
 
 class LineItemDigital(LineItem):
@@ -583,14 +589,14 @@ class LineItemDigital(LineItem):
 
         # validation
         if self.servedBy not in self.possible_servedby:
-            raise PATSException("servedBy %s not valid." % self.servedBy)
+            raise PATSException("Placement %s: servedBy %s not valid." % (self.name, self.servedBy))
         if self.buyCategory not in self.possible_buy_categories_digital and self.packageType != "Package":
-            raise PATSException("Buy Category %s not valid." % self.buyCategory)
+            raise PATSException("Placement %s: Buy Category %s not valid." % (self.name, self.buyCategory))
         if self.creativeType not in self.possible_creative_types and self.packageType != "Package":
-            raise PATSException("creativeType %s not valid." % self.creativeType)
+            raise PATSException("Placement %s: creativeType %s not valid." % (self.name, self.creativeType))
         # We have groupName for revisions but packageName for proposals...
         #if self.packageType in ('Package', 'Roadblock', 'Child') and self.groupName == None:
-        #    raise PATSException("Group Name required for package type %s" % self.packageType)
+        #    raise PATSException("Placement %s: Group Name required for package type %s" % (self.name, self.packageType))
 
     def dict_repr(self):
         dict = super(LineItemDigital, self).dict_repr()
