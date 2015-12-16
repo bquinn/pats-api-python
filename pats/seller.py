@@ -328,6 +328,7 @@ class PATSSeller(PATSAPIClient):
     def list_order_versions(self, campaign_id=None, order_id=None, user_id=None, vendor_id=None):
         """
         As a seller, view a list of all versions of an order
+
         http://developer.mediaocean.com/docs/seller_orders/List_order_versions_seller
         """
         if campaign_id == None:
@@ -379,45 +380,45 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
-    def view_revision_status_summary(self, user_id=None, order_id=None):
-        """
-        http://developer.mediaocean.com/docs/publisher_orders_api/Revision_status_summary
-        """
-        if user_id is not None:
-            user_id = self.user_id
-        extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
-            'X-MO-User-Id': self.user_id
-        }
-        path = '/vendors/%s/orders/%s/revisionstatus' % (self.vendor_id, order_id)
-        js = self._send_request(
-            "GET",
-            PUBLISHER_API_DOMAIN,
-            path,
-            extra_headers
-        )
-        return js
+#    def view_revision_status_summary(self, user_id=None, order_id=None):
+#        """
+#        http://developer.mediaocean.com/docs/publisher_orders_api/Revision_status_summary
+#        """
+#        if user_id is not None:
+#            user_id = self.user_id
+#        extra_headers = {
+#            'Accept': 'application/vnd.mediaocean.order-v1+json',
+#            'X-MO-User-Id': self.user_id
+#        }
+#        path = '/vendors/%s/orders/%s/revisionstatus' % (self.vendor_id, order_id)
+#        js = self._send_request(
+#            "GET",
+#            PUBLISHER_API_DOMAIN,
+#            path,
+#            extra_headers
+#        )
+#        return js
 
-    def view_revision_status_detail(self, user_id=None, order_id=None, order_version=None, revision_version=None):
-        """
-        http://developer.mediaocean.com/docs/publisher_orders_api/Revision_status_detail
-        """
-        extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
-            'X-MO-User-Id': self.user_id
-        }
-        path = '/vendors/%s/orders/%s/revisionstatus/detail?' % (self.vendor_id, order_id)
-        if order_version:
-            path += "orderVersion=%s" % order_version
-        if revision_version:
-            path += "&revisionVersion=%s" % revision_version
-        js = self._send_request(
-            "GET",
-            PUBLISHER_API_DOMAIN,
-            path,
-            extra_headers
-        )
-        return js
+#    def view_revision_status_detail(self, user_id=None, order_id=None, order_version=None, revision_version=None):
+#        """
+#        http://developer.mediaocean.com/docs/publisher_orders_api/Revision_status_detail
+#        """
+#        extra_headers = {
+#            'Accept': 'application/vnd.mediaocean.order-v1+json',
+#            'X-MO-User-Id': self.user_id
+#        }
+#        path = '/vendors/%s/orders/%s/revisionstatus/detail?' % (self.vendor_id, order_id)
+#        if order_version:
+#            path += "orderVersion=%s" % order_version
+#        if revision_version:
+#            path += "&revisionVersion=%s" % revision_version
+#        js = self._send_request(
+#            "GET",
+#            PUBLISHER_API_DOMAIN,
+#            path,
+#            extra_headers
+#        )
+#        return js
 
     def view_order_events(self, order_id=None):
         """
@@ -444,7 +445,7 @@ class PATSSeller(PATSAPIClient):
         )
         return js
         
-    def send_order_revision(self, order_id=None, user_id=None, comment=None, print_line_items=None, digital_line_items=None):
+    def send_order_revision(self, order_id=None, version=None, user_id=None, comment=None, print_line_items=None, digital_line_items=None):
         """
         Send a revision (ie a proposed new version) of an order back to the buyer.
         Must always be in response to a sent order.
@@ -452,9 +453,13 @@ class PATSSeller(PATSAPIClient):
         user_id: seller username who is sending the revision
         print_line_items / digital_line_items (one only):
             array of InsertionOrderLineItemPrint or InsertionOrderLineItemDigital objects.
+
+        http://developer.mediaocean.com/docs/read/seller_orders/Send_order_revision_seller
         """
         if order_id == None:
             raise PATSException("order ID is required")
+        if version == None:
+            raise PATSException("version is required")
 
         data = {
             'comment': comment
@@ -474,7 +479,7 @@ class PATSSeller(PATSAPIClient):
                 "printLineItems": print_line_items_obj
             })
 
-        return self.send_order_revision_raw(order_id=order_id, user_id=user_id, data=data)
+        return self.send_order_revision_raw(order_id=order_id, version=version, user_id=user_id, data=data)
 
     def send_order_revision_raw(self, vendor_id=None, order_id=None, version=None, user_id=None, data=None):
         """
@@ -492,6 +497,8 @@ class PATSSeller(PATSAPIClient):
             vendor_id=self.vendor_id # default but can be overridden
         if order_id == None:
             raise PATSException("Order ID is required")
+        if version == None:
+            raise PATSException("version is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json'
         }
@@ -514,38 +521,38 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
-    def respond_to_order(self, user_id=None, order_id=None, status=None, comments=None):
+    def respond_to_order(self, user_id=None, order_id=None, version=None, response=None, comment=None):
         """
         As a seller, Accept or Reject an order from a buyer.
 
-        http://developer.mediaocean.com/docs/read/publisher_orders_api/Respond_to_Order
+        http://developer.mediaocean.com/docs/read/seller_orders/Respond_to_order_seller
         """
         if user_id == None:
             raise PATSException("User ID (seller email) is required")
         if order_id == None:
             raise PATSException("Order ID is required")
-        if status == None or status not in ("Accepted", "Rejected"):
-            raise PATSException("status (\"Accepted\" or \"Rejected\") is required")
-        if comments == None or comments == "":
-            raise PATSException("comments are required for accepting or rejecting an order")
+        if response == None or response not in ("accept", "reject"):
+            raise PATSException("response (\"accept\" or \"reject\") is required")
+        if comment == None or comment == "":
+            raise PATSException("comment is required for accepting or rejecting an order")
 
         extra_headers = {
             'X-MO-User-Id': user_id,
-            'Accept': 'application/vnd.mediaocean.order-v1+json'
+            'X-MO-Organization-Id': self.vendor_id,
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-App': 'pats'
         }
         data = {
-            "status": status,
-            "comments": comments
+            "comment": comment
         }
 
         js = self._send_request(
-            "PUT",
+            "POST",
             PUBLISHER_API_DOMAIN,
-            '/vendors/%s/orders/%s/respond' % (self.vendor_id, order_id),
+            '/orders/%s/versions/%s?operation=%s' % (order_id, version, response),
             extra_headers,
             json.dumps(data)
         )
-        # Should parse the response and return something more intelligible
         return js
 
     def view_rfps(self, start_date=None, end_date=None):
@@ -570,7 +577,6 @@ class PATSSeller(PATSAPIClient):
             path,
             extra_headers
         )
-        # TODO: Parse the response and return something more intelligible
         return js
 
     def view_proposals(self, rfp_id=None):
