@@ -493,8 +493,10 @@ class PATSBuyer(PATSAPIClient):
         digital_line_items: object inserted as "line_items" in the order
         print_line_items: object inserted as "line_items" in the order
 
-        http://developer.mediaocean.com/docs/read/orders_api/Create_online_order
-        http://developer.mediaocean.com/docs/read/orders_api/Create_print_order
+        http://developer.mediaocean.com/docs/buyer_orders/Send_order_buyer
+        http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#order_version
+        http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#digital
+        http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#print
         """
         # has default but can be overridden
         if agency_id == None:
@@ -537,7 +539,7 @@ class PATSBuyer(PATSAPIClient):
             })
         return self.create_order_raw(agency_id=agency_id, agency_group_id=agency_group_id, user_id=user_id, campaign_id=campaign_id, data=data)
 
-    def create_order_raw(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, data=None):
+    def create_order_raw(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, order_id=None, data=None):
         """
         create a print or digital order in PATS using a fully formed JSON payload
         instead of Python objects.
@@ -546,10 +548,16 @@ class PATSBuyer(PATSAPIClient):
         agency_group_id: PATS ID of the buying company (eg PATS3)
         person_id: (optional?) PATS ID of the person sending the order (different
             from the person named as the buyer contact in the order)
+        campaign_id: PATS Campaign ID (eg CXFQ) to which this order is being added
+        order_id (optional): if supplied, this order is treated as a re-send of an existing order
         data: full JSON payload - must contain campaign ID, insertion order details and all line items
 
-        http://developer.mediaocean.com/docs/read/orders_api/Create_online_order
-        http://developer.mediaocean.com/docs/read/orders_api/Create_print_order
+        http://developer.mediaocean.com/docs/buyer_orders/Send_order_buyer
+        http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#order_version
+        http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#digital
+        http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#print
+
+        http://developer.mediaocean.com/docs/buyer_orders/Resend_order_buyer
         """
         if agency_id==None:
             agency_id=self.agency_id
@@ -568,11 +576,16 @@ class PATSBuyer(PATSAPIClient):
                 'X-MO-User-ID': user_id
             })
 
+        if order_id:
+            path = "/campaigns/%s/orders/%s/versions" % (campaign_id, order_id)
+        else:
+            path = "/campaigns/%s/orders" % campaign_id
+
         # send request - as it returns 201 Created on success, _send_request parses out the Location header and returns the full location
         order_uri = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,
-            "/campaigns/%s/orders" % campaign_id,
+            path,
             extra_headers,
             json.dumps(data)
         )
@@ -582,9 +595,11 @@ class PATSBuyer(PATSAPIClient):
             order_id = match.group(3)
         return order_id
 
-    def list_orders(self, agency_id=None, agency_group_id=None, user_id=None, since_date=None, page_size=50, page=1):
+    def list_orders(self, agency_id=None, agency_group_id=None, user_id=None, since_date=None, page_size=25, page=1):
         """
         Retrieve a list of all orders booked since "since_date" (new in 2015.8)
+
+        http://developer.mediaocean.com/docs/buyer_orders/Find_orders_buyer
         """
         if since_date == None:
             raise PATSException("Since date is required")
@@ -804,6 +819,7 @@ class PATSBuyer(PATSAPIClient):
     def get_order_attachment(self, user_id=None, agency_group_id=None, agency_id=None, campaign_id=None, order_id=None, attachment_id=None):
         """
         Get an attachment for an order (including the PDF of the order itself).
+
         http://developer.mediaocean.com/docs/buyer_orders/Get_order_attachment_buyer
         """
         if agency_group_id == None:
@@ -835,7 +851,7 @@ class PATSBuyer(PATSAPIClient):
         """
         "Return order revision" which means "Send a message back to the person who sent this revision"
 
-        http://developer.mediaocean.com/docs/read/orders_api/Return_revision
+        http://developer.mediaocean.com/docs/buyer_orders/Return_order_rev_buyer
         """
         if agency_id == None:
             agency_id = self.agency_id
@@ -868,6 +884,7 @@ class PATSBuyer(PATSAPIClient):
     def request_order_revision(self, agency_group_id=None, agency_id=None, campaign_id=None, order_id=None, version=None, user_id=None, seller_email=None, revision_due_date=None, comment=None):
         """
         "Request order revision" which means "Send a message to the person who received this order"
+
         http://developer.mediaocean.com/docs/buyer_orders/Request_rev_buyer
         """
         # TODO: allow attachments
