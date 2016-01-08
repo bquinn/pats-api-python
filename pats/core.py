@@ -37,7 +37,7 @@ import re
 import string
 from urllib import urlencode
 
-VERSION = '0.7' # in-progress update for 2015.8 APIs
+VERSION = '0.8' # in-progress update #2 for 2015.8 APIs
 
 class PATSException(Exception):
     pass
@@ -165,17 +165,6 @@ class PATSAPIClient(object):
             else:
                 # if we didn't get a JSON payload (eg Create RFP), just report the whole response
                 self._relay_error(response_status, response_text)
-        # sometimes the call returns 200 but then have a "FAILED" message in the response
-        if 'status' in js and js['status'] == 'FAILED':
-            errorString = ""
-            for errorjs in js['fieldValidations']:
-                if errorString:
-                    errorString += ", "
-                if 'dataName' in errorjs and errorjs['dataName'] != None:
-                    errorString += errorjs['dataName'] + ": "
-                if 'message' in errorjs:
-                    errorString += errorjs['message']
-            self._relay_error(422, errorString)
 
         return js
 
@@ -417,21 +406,36 @@ class LineItem(JSONSerializable):
         self.supplierPlacementParentReference = self.getvar('supplierPlacementParentReference', None, args, kwargs)
         self.mediaProperty = self.getvar('mediaProperty', None, args, kwargs)
 
+    def getPackageType(self):
+        return None
+
     def dict_repr(self):
         dict = {
             "externalId": self.externalId,
             "name": self.name,
-            "buyType": self.buyType,
-            "buyCategory": self.buyCategory,
             "packageType": self.packageType,
-            "unitType": self.unitType,
-            "units": self.units,
-            "costMethod": self.costMethod,
-            "cost": "{0:.2f}".format(self.cost),
             "comments": self.comments,
             "supplierPlacementParentReference": self.supplierPlacementParentReference,
             "mediaProperty": self.mediaProperty
         }
+        packageType = self.getPackageType()
+        if packageType != "Roadblock" and packageType != "Package":
+            dict.update({
+                "buyType": self.buyType,
+                "buyCategory": self.buyCategory
+            })
+        if packageType != "Child":
+            dict.update({
+                "unitType": self.unitType,
+                "costMethod": self.costMethod,
+                "cost": round(self.cost,2),
+                "rate": round(self.rate,4),
+                "units": self.units,
+            })
+            #if self.buyType != "Print Fee" and self.buyType != "Fee":
+            #    dict.update({
+            #        "rate": round(self.rate,4),
+            #    })
         if self.id:
             dict.update({
                 "id": self.id
@@ -448,9 +452,8 @@ class LineItem(JSONSerializable):
             dict.update({
                 "referenceId": self.referenceId,
             })
-        if self.buyType != "Print Fee":
+        if self.buyType != "Print Fee" and self.buyType != "Fee":
             dict.update({
-                "rate": "{0:.4f}".format(self.rate),
                 "section": self.section,
                 "subsection": self.subsection
             })
@@ -517,14 +520,17 @@ class LineItemPrint(LineItem):
                 'saleDate': self.saleDate.strftime("%Y-%m-%d"),
                 'size' : {
                     'type': self.size_type,
-                    'units': self.size_units,
-                    'columns': self.size_columns
                 },
                 'positionGuaranteed': self.positionGuaranteed,
                 'includeInDigitalEdition': self.includeInDigitalEdition,
                 'position': self.position,
                 'region': self.region
             })
+            if self.size_units:
+                dict['size'].update({
+                    'units': self.size_units,
+                    'columns': self.size_columns
+                })
         return dict
 
 class LineItemDigital(LineItem):
@@ -579,7 +585,7 @@ class LineItemDigital(LineItem):
         self.flightStartDate = self.getvar('flightStartDate', '', args, kwargs)
         self.flightEndDate = self.getvar('flightEndDate', '', args, kwargs)
         self.parentExternalId = self.getvar('parentExternalId', None, args, kwargs)
-        self.primaryPlacement = self.getvar('primaryPlacement', None, args, kwargs)
+        self.primaryPlacement = self.getvar('primaryPlacement', False, args, kwargs)
         self.dimensions = self.getvar('dimensions', '', args, kwargs)
         self.position = self.getvar('position', '', args, kwargs)
         self.servedBy = self.getvar('servedBy', None, args, kwargs)
@@ -588,31 +594,41 @@ class LineItemDigital(LineItem):
         self.flighting = self.getvar('flighting', None, args, kwargs)
 
         # validation
-        if self.servedBy not in self.possible_servedby:
-            raise PATSException("Placement %s: servedBy %s not valid." % (self.name, self.servedBy))
-        if self.buyCategory not in self.possible_buy_categories_digital and self.packageType != "Package":
+        #if self.servedBy not in self.possible_servedby:
+        #    raise PATSException("Placement %s: servedBy %s not valid." % (self.name, self.servedBy))
+        if self.buyCategory not in self.possible_buy_categories_digital and self.packageType != "Package" and self.packageType != "Roadblock":
             raise PATSException("Placement %s: Buy Category %s not valid." % (self.name, self.buyCategory))
-        if self.creativeType not in self.possible_creative_types and self.packageType != "Package":
-            raise PATSException("Placement %s: creativeType %s not valid." % (self.name, self.creativeType))
+        #if self.creativeType not in self.possible_creative_types and self.packageType != "Package":
+        #    raise PATSException("Placement %s: creativeType %s not valid." % (self.name, self.creativeType))
         # We have groupName for revisions but packageName for proposals...
         #if self.packageType in ('Package', 'Roadblock', 'Child') and self.groupName == None:
         #    raise PATSException("Placement %s: Group Name required for package type %s" % (self.name, self.packageType))
 
+    def getPackageType(self):
+        return self.packageType
+
     def dict_repr(self):
         dict = super(LineItemDigital, self).dict_repr()
         dict.update({
-            "primaryPlacement": self.primaryPlacement,
-            "dimensions": self.dimensions,
-            "position": self.position,
-            "target": self.target,
-            "creativeType": self.creativeType,
-            "servedBy": self.servedBy,
-            "flightStartDate": self.flightStartDate.strftime("%Y-%m-%d"),
-            "flightEndDate": self.flightEndDate.strftime("%Y-%m-%d"),
+            "primaryPlacement": self.primaryPlacement
         })
-        if self.parentExternalId:
+        if self.getPackageType() != "Package" and self.getPackageType() != "Roadblock":
+            dict.update({
+                "servedBy": self.servedBy,
+                "dimensions": self.dimensions,
+                "position": self.position,
+                "target": self.target,
+                "creativeType": self.creativeType,
+            })
+        if self.getPackageType() == "Child":
             dict.update({
                 "parentExternalId": self.parentExternalId
+            })
+        else:
+            # not a package child so it has a flight start and end date
+            dict.update({
+                "flightStartDate": self.flightStartDate.strftime("%Y-%m-%d"),
+                "flightEndDate": self.flightEndDate.strftime("%Y-%m-%d"),
             })
         if self.flighting:
             dict.update({

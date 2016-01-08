@@ -318,7 +318,7 @@ class PATSSeller(PATSAPIClient):
         full_json_list = []
         remaining_content = True 
         while (remaining_content):
-            partial_json_list = self.list_orders(since_date, page_size=page_size, page=page)
+            partial_json_list = self.list_orders(since_date=since_date, page_size=page_size, page=page)
             full_json_list.extend(partial_json_list)
             page = page + 1
             remaining_content = (len(partial_json_list) == page_size)
@@ -380,47 +380,63 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
-#    def view_revision_status_summary(self, user_id=None, order_id=None):
-#        """
-#        http://developer.mediaocean.com/docs/publisher_orders_api/Revision_status_summary
-#        """
-#        if user_id is not None:
-#            user_id = self.user_id
-#        extra_headers = {
-#            'Accept': 'application/vnd.mediaocean.order-v1+json',
-#            'X-MO-User-Id': self.user_id
-#        }
-#        path = '/vendors/%s/orders/%s/revisionstatus' % (self.vendor_id, order_id)
-#        js = self._send_request(
-#            "GET",
-#            PUBLISHER_API_DOMAIN,
-#            path,
-#            extra_headers
-#        )
-#        return js
+    def list_order_revisions(self, campaign_id=None, order_id=None, version=None, user_id=None, vendor_id=None):
+        """
+        As a seller, view a list of all revisions of a given version of an order
 
-#    def view_revision_status_detail(self, user_id=None, order_id=None, order_version=None, revision_version=None):
-#        """
-#        http://developer.mediaocean.com/docs/publisher_orders_api/Revision_status_detail
-#        """
-#        extra_headers = {
-#            'Accept': 'application/vnd.mediaocean.order-v1+json',
-#            'X-MO-User-Id': self.user_id
-#        }
-#        path = '/vendors/%s/orders/%s/revisionstatus/detail?' % (self.vendor_id, order_id)
-#        if order_version:
-#            path += "orderVersion=%s" % order_version
-#        if revision_version:
-#            path += "&revisionVersion=%s" % revision_version
-#        js = self._send_request(
-#            "GET",
-#            PUBLISHER_API_DOMAIN,
-#            path,
-#            extra_headers
-#        )
-#        return js
+        http://developer.mediaocean.com/docs/seller_orders/List_order_revs_seller
+        """
+        #if campaign_id == None:
+        #    raise PATSException("Campaign ID is required")
+        if order_id == None:
+            raise PATSException("Order ID is required")
+        if version == None:
+            raise PATSException("Order version is required")
+        if user_id == None:
+            user_id = self.user_id
+        if vendor_id == None:
+            vendor_id = self.vendor_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-Organization-Id': vendor_id,
+            'X-MO-User-Id': self.user_id,
+            'X-MO-App': 'pats'
+        }
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            '/orders/%s/versions/%s/revisions' % (order_id, version),
+            extra_headers
+        )
+        return js
 
-    def view_order_events(self, order_id=None):
+    def view_order_revision_detail(self, order_id=None, version=None, revision=None):
+        """
+        As a seller, view detail of a particular revision of a version of an order.
+
+        https://developer.mediaocean.com/docs/read/seller_orders/Get_order_rev_details_seller
+        """
+        if order_id == None:
+            raise PATSException("Order ID is required")
+        if version == None:
+            raise PATSException("Version is required")
+        if revision == None:
+            raise PATSException("Revision is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-Organization-Id': self.vendor_id,
+            'X-MO-User-Id': self.user_id,
+            'X-MO-App': 'pats'
+        }
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            '/orders/%s/versions/%s/revisions/%s' % (order_id, version, revision),
+            extra_headers
+        )
+        return js
+
+    def list_order_events(self, order_id=None):
         """
         As a seller, view the event history (ie all changes) of an order.
 
@@ -506,20 +522,24 @@ class PATSSeller(PATSAPIClient):
             extra_headers.update({
                 'X-MO-User-Id': user_id,
                 'X-MO-Organization-Id': vendor_id,
-                'X-MO-Brand': 'pats'
+                'X-MO-App': 'pats'
             })
 
         path = '/orders/%s/versions/%s/revisions?operation=send' % (order_id, version)
 
-        # send request
-        js = self._send_request(
+        # send request - as it returns 201 Created on success, _send_request parses out the Location header and returns the full location
+        order_uri = self._send_request(
             "POST",
             PUBLISHER_API_DOMAIN,
             path,
             extra_headers,
             json.dumps(data)
         )
-        return js
+        match = re.search('https?://(.+)?/orders/(.+?)/versions/(.+?)/revisions/(.+?)$', order_uri)
+        revision_id = None
+        if match:
+            revision_number = int(match.group(4))
+        return revision_number
 
     def respond_to_order(self, user_id=None, order_id=None, version=None, response=None, comment=None):
         """
@@ -636,11 +656,11 @@ class PATSSeller(PATSAPIClient):
         digital_line_items_obj = []
         if digital_line_items:
             for line_item in digital_line_items:
-                digital_line_items_obj.append(line_item.dict_repr(mode="seller"))
+                digital_line_items_obj.append(line_item.dict_repr())
         print_line_items_obj = []
         if print_line_items:
             for line_item in print_line_items:
-                print_line_items_obj.append(line_item.dict_repr(mode="seller"))
+                print_line_items_obj.append(line_item.dict_repr())
 
         data = {
             "rfpPublicId": rfp_id,
