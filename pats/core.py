@@ -429,13 +429,12 @@ class LineItem(JSONSerializable):
                 "unitType": self.unitType,
                 "costMethod": self.costMethod,
                 "cost": round(self.cost,2),
-                "rate": round(self.rate,4),
                 "units": self.units,
             })
-            #if self.buyType != "Print Fee" and self.buyType != "Fee":
-            #    dict.update({
-            #        "rate": round(self.rate,4),
-            #    })
+            if self.buyType != "Print Fee": #  and self.buyType != "Fee":
+                dict.update({
+                    "rate": round(self.rate,4),
+                })
         if self.id:
             dict.update({
                 "id": self.id
