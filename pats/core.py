@@ -39,6 +39,8 @@ from urllib import urlencode
 
 VERSION = '0.8' # in-progress update #2 for 2015.8 APIs
 
+RETRY_LIMIT = 3 # number of times to re-try HTTP requests if we get a gateway timeout error
+
 class PATSException(Exception):
     pass
 
@@ -115,14 +117,23 @@ class PATSAPIClient(object):
             curl += '"https://%s%s"' % (domain, path)
             self.session['curl_command'] = curl
              
-        # Perform the request and get the response headers and content
-        h.request(method,
+        # Perform the request (with retries) and get the response headers and content
+        retries = RETRY_LIMIT; response = ''; response_status = 0; response_text = ''
+        for n in range(retries):
+            h.request(method,
                   path,
                   body,
                   headers)
-        response = h.getresponse()
-        response_status = response.status
-        response_text = response.read()
+            
+            response = h.getresponse()
+            response_status = response.status
+            response_text = response.read()
+            if response_status == 504 and response_text.find("TIMEOUT") != -1:
+                # gateway timeout error: sleep then retry (up to retry limit)
+                time.sleep(5)
+            else:
+                # go on
+                break
         if self.raw_mode and self.session:
             self.session['response_status'] = response_status
             self.session['response_text'] = response_text
@@ -505,6 +516,8 @@ class LineItemPrint(LineItem):
         # validation
         if self.buyCategory not in self.possible_buy_categories_print:
             raise PATSException("Placement %s: Buy Category %s not valid." % (self.name, self.buyCategory))
+        if not self.saleDate and self.buyType != 'Print Fee':
+            raise PATSException("Placement %s: saleDate is required" % (self.name))
         #if self.unitType == "Insert" and self.buyCategory != "Inserts":
         #    raise PATSException("For unitType Insert, buyCategory %s is not valid (must be Inserts)." % self.buyCategory)
 
@@ -516,10 +529,10 @@ class LineItemPrint(LineItem):
         if self.buyType != "Print Fee":
             dict.update({
                 'color': self.color,
-                'saleDate': self.saleDate.strftime("%Y-%m-%d"),
                 'size' : {
                     'type': self.size_type,
                 },
+                'saleDate': self.saleDate.strftime("%Y-%m-%d"),
                 'positionGuaranteed': self.positionGuaranteed,
                 'includeInDigitalEdition': self.includeInDigitalEdition,
                 'position': self.position,
