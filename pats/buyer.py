@@ -486,7 +486,7 @@ class PATSBuyer(PATSAPIClient):
         # {"total":117,"products":[{"vendorPublicId":"35-EEBMG4J-4","productPublicId":"PC-11TU", ... }
         return js
 
-    def create_order(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, media_type=None, currency_code=None, external_order_id=None, vendor_id=None, recipient_emails=None, buyer_dict=None, notify_emails=None, additional_info=None, order_comment=None, respond_by_date=None, terms_and_conditions_name=None, terms_and_conditions_content=None, digital_line_items=None, print_line_items=None, **kwargs):
+    def send_order(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, media_type=None, currency_code=None, external_order_id=None, vendor_id=None, recipient_emails=None, buyer_dict=None, notify_emails=None, additional_info=None, order_comment=None, respond_by_date=None, terms_and_conditions_name=None, terms_and_conditions_content=None, digital_line_items=None, print_line_items=None, order_id=None, **kwargs):
         """
         Create a print or digital order in PATS.
         agency_id: PATS ID of the buying agency (eg 35-IDSDKAD-7)
@@ -497,6 +497,7 @@ class PATSBuyer(PATSAPIClient):
         campaign_id: campaign to which to attach this order
         digital_line_items: object inserted as "line_items" in the order
         print_line_items: object inserted as "line_items" in the order
+        order_id (optional): for "re-send" orders, which order_id is being updated
 
         http://developer.mediaocean.com/docs/buyer_orders/Send_order_buyer
         http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#order_version
@@ -542,9 +543,9 @@ class PATSBuyer(PATSAPIClient):
             data.update({
                 'printLineItems':line_items
             })
-        return self.create_order_raw(agency_id=agency_id, agency_group_id=agency_group_id, user_id=user_id, campaign_id=campaign_id, data=data)
+        return self.send_order_raw(agency_id=agency_id, agency_group_id=agency_group_id, user_id=user_id, campaign_id=campaign_id, data=data, order_id=order_id)
 
-    def create_order_raw(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, order_id=None, data=None):
+    def send_order_raw(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, order_id=None, data=None):
         """
         create a print or digital order in PATS using a fully formed JSON payload
         instead of Python objects.
@@ -594,7 +595,7 @@ class PATSBuyer(PATSAPIClient):
             extra_headers,
             json.dumps(data)
         )
-        match = re.search('https?://(.+)?/campaigns/(.+?)/orders/(.+?)/versions/0$', order_uri)
+        match = re.search('https?://(.+)?/campaigns/(.+?)/orders/(.+?)/versions/(.+?)$', order_uri)
         order_id = None
         if match:
             order_id = match.group(3)
@@ -797,10 +798,10 @@ class PATSBuyer(PATSAPIClient):
             agency_group_id = self.agency_group_id
         if agency_id == None:
             agency_id = self.agency_id
-        if campaign_id == None:
-            raise PATSException("Campaign ID is required")
         if user_id == None:
             user_id = self.user_id
+        if campaign_id == None:
+            raise PATSException("Campaign ID is required")
         if order_id == None:
             raise PATSException("Order ID is required")
         extra_headers = {
@@ -828,6 +829,12 @@ class PATSBuyer(PATSAPIClient):
             agency_id = self.agency_id
         if agency_group_id == None:
             agency_group_id = self.agency_group_id
+        if user_id == None:
+            user_id = self.user_id
+        if campaign_id == None:
+            raise PATSException("Campaign ID is required")
+        if order_id == None:
+            raise PATSException("Order ID is required")
         # TODO: allow attachments
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
@@ -860,10 +867,18 @@ class PATSBuyer(PATSAPIClient):
         """
         # TODO: allow attachments
 
+        if campaign_id == None:
+            raise PATSException("Campaign ID is required")
+        if order_id == None:
+            raise PATSException("Order ID is required")
+        if version == None:
+            raise PATSException("Version is required")
         if agency_group_id == None:
             agency_group_id = self.agency_group_id
         if agency_id == None:
             agency_id = self.agency_id
+        if user_id == None:
+            user_id = self.user_id
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.order-v1+json',
             'X-MO-App': 'prisma',
