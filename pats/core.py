@@ -273,26 +273,26 @@ class CampaignDetails(JSONSerializable):
             },
             "multiCurrency": self.multi_currency
         }
-        if self.campaign_budget and (self.print_campaign_budget or self.digital_campaign_budget):
-            raise PATSException("Campaign can't have both individual budgets and a campaign budget")
+        #if self.campaign_budget and (self.print_campaign_budget or self.digital_campaign_budget):
+        #    raise PATSException("Campaign can't have both individual budgets and a campaign budget")
         # we want to end up with either
         # "MediaBudget": { "Medias": { "Media": [ { "MediaMix": "Online" }, {"MediaMix": "Print" } ] }, "CampaignBudget": 50000 }
         # or
         # "MediaBudget": { "Medias": { "Media": [ { "MediaMix": "Online", "Budget": 50000.00 } ] } }
         media_budget = {}
-        if self.campaign_budget:
+        if self.campaign_budget and self.campaign_budget > 0:
             media_budget.update({
                 "campaignBudget": self.campaign_budget,
             })
         medias = []
         if self.print_campaign:
             print_campaign = {"mediaMix": "Print"}
-            if self.print_campaign_budget:
+            if self.print_campaign_budget and int(self.print_campaign_budget) > 0:
                 print_campaign.update({"budget": self.print_campaign_budget})
             medias.append(print_campaign)
         if self.digital_campaign:
             digital_campaign = {"mediaMix": "Online"}
-            if self.digital_campaign_budget:
+            if self.digital_campaign_budget  and int(self.digital_campaign_budget) > 0:
                 digital_campaign.update({"budget": self.digital_campaign_budget})
             medias.append(digital_campaign)
         media_budget.update({ "medias": { "media": medias } })
