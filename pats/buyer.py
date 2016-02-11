@@ -38,7 +38,7 @@ import re
 import string
 import types
 from urllib import urlencode
-from .core import PATSAPIClient, PATSException, CampaignDetails, InsertionOrderDetails
+from .core import PATSAPIClient, PATSException, CampaignDetails
 
 AGENCY_API_DOMAIN = 'prisma-demo.api.mediaocean.com'
 
@@ -208,7 +208,7 @@ class PATSBuyer(PATSAPIClient):
 
     def view_campaign_detail(self, agency_group_id=None, agency_id=None, user_id=None, campaign_id=None):
         """
-        In 2015.8, we don't have to use workarounds, there's a view campaign call
+        New call as of 2015.8
         """
         if agency_group_id is None:
             agency_group_id = self.agency_group_id
@@ -231,7 +231,7 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def submit_rfp(self, sender_user_id=None, agency_group_id=None, campaign_public_id=None, currency='GBP', budget_amount=None, budgets=None, start_date=None, end_date=None, respond_by_date=None, comments="", publisher_id=None, publisher_emails=None, publishers=None, media_print=None, media_online=None, strategy=None, requested_products=None, attachments=None):
+    def send_rfp(self, sender_user_id=None, agency_group_id=None, campaign_id=None, currency='GBP', budget_amount=None, budgets=None, start_date=None, end_date=None, respond_by_date=None, comments="", publisher_id=None, publisher_emails=None, publishers=None, media_print=None, media_online=None, strategy=None, requested_products=None, attachments=[]):
         """
         Send an RFP to one or more publishers.
         Can optionally include product IDs.
@@ -240,11 +240,14 @@ class PATSBuyer(PATSAPIClient):
         organisation_id = self.agency_id
         if agency_group_id is None:
             agency_group_id = self.agency_group_id
+        if sender_user_id is None:
+            sender_user_id = self.user_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
             'X-MO-Organization-Id': organisation_id,
             'X-MO-Agency-Group-ID': agency_group_id,
-            'X-MO-User-Id': sender_user_id
+            'X-MO-User-Id': sender_user_id,
+            'X-MO-App': 'prisma'
         }
         media = []
         if media_print:
@@ -252,14 +255,14 @@ class PATSBuyer(PATSAPIClient):
         if media_online:
             media.append('Online')
         data = {
-            'agencyPublicId': self.agency_id,
-            'campaignPublicId': campaign_public_id,
+            'agencyId': self.agency_id,
+            'campaignId': campaign_id,
             'startDate': start_date.strftime("%Y-%m-%d"),
             'endDate': end_date.strftime("%Y-%m-%d"),
             'responseDueDate': respond_by_date.strftime("%Y-%m-%d"),
             'comments': comments,
             'media': media,
-            'currency': currency,
+            'currencyCode': currency,
             'strategy': strategy # must be one of defined set of terms
         }
         # user can supply "budget_amount" with one budget or "budgets" with a list
@@ -273,30 +276,98 @@ class PATSBuyer(PATSAPIClient):
         # with a dict for multiple publishers
         if publisher_id and publisher_emails:
             data.update({
-                'publisherRecipients': [
-                    {
-                        'publisherPublicId': publisher_id,
-                        'emails': publisher_emails,
-                    }
-                ]
+                'publisherRecipient': {
+                    'publisherPublicId': publisher_id,
+                    'emails': publisher_emails,
+                }
             })
         elif publishers:
             data.update({
-                'publisherRecipients': publishers
+                'publisherRecipient': publishers
             })
             
         if requested_products and requested_products != '':
             data.update({'requestedProducts': requested_products })
         # handle attachments - expect an array containing dicts
         # of { "fileName", "mimeType" and "contents" }
-        if attachments:
-            data.update({ 'attachments': attachments })
-        js = self._send_request(
+        # attachments is now mandatory, even if it's an empty array
+        # if attachments:
+        data.update({ 'attachments': attachments })
+        # We get the Location: header returned
+        rfp_uri = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,
-            "/agencies/%s/campaigns/%s/rfps" % (self.agency_id, campaign_public_id),
+            "/campaigns/%s/rfps" % campaign_id,
             extra_headers,
             json.dumps(data)
+        )
+        match = re.search('https?://(.+)?/rfps/(.+?)$', rfp_uri)
+        rfp_id = None
+        if match:
+            rfp_id = match.group(2)
+        return rfp_id
+
+    def list_rfps(self, start_date=None, end_date=None, page=None):
+        """
+        As a buyer, view all RFPs I have sent and their status.
+
+        https://developer.mediaocean.com/docs/buyer_proposals/Find_RFPs
+        """
+        if agency_group_id is None:
+            agency_group_id = self.agency_group_id
+        if agency_id is None:
+            agency_id = self.agency_id
+
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
+            'X-MO-Organization-ID': agency_id,
+            'X-MO-Agency-Group-ID': agency_group_id,
+            'X-MO-User-Id': self.user_id,
+            'X-MO-App': 'prisma'
+        }
+
+        path = '/rfps?'
+        if start_date:
+            path += "startDate=%s" % start_date.strftime("%Y-%m-%d")
+        if end_date:
+            path += "&endDate=%s" % end_date.strftime("%Y-%m-%d")
+        if page:
+            path += "&page=%s" % page
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        return js
+
+    def list_rfps_for_campaign(self, agency_group_id=None, agency_id=None, campaign_id=None):
+        """
+        As a buyer, view all RFPs sent against a given campaign ID.
+
+        https://developer.mediaocean.com/docs/read/buyer_proposals/List_RFPs
+        """
+        if campaign_id is None:
+            raise PATSException("Campaign ID is required")
+        if agency_group_id is None:
+            agency_group_id = self.agency_group_id
+        if agency_id is None:
+            agency_id = self.agency_id
+
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
+            'X-MO-Organization-ID': agency_id,
+            'X-MO-Agency-Group-ID': agency_group_id,
+            'X-MO-User-Id': self.user_id,
+            'X-MO-App': 'prisma'
+        }
+
+        path = '/campaigns/%s/rfps?' % campaign_id
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            path,
+            extra_headers
         )
         return js
 
@@ -314,15 +385,16 @@ class PATSBuyer(PATSAPIClient):
         if agency_id is None:
             agency_id = self.agency_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
             'X-MO-Organization-ID': agency_id,
             'X-MO-Agency-Group-ID': agency_group_id,
-            'X-MO-User-Id': user_id
+            'X-MO-User-Id': user_id,
+            'X-MO-App': 'prisma'
         }
         js = self._send_request(
             "GET",
             AGENCY_API_DOMAIN,
-            "/agencies/%s/rfps/%s" % (self.agency_id, rfp_id),
+            "/rfps/%s" % rfp_id,
             extra_headers
         )
         return js
@@ -333,7 +405,7 @@ class PATSBuyer(PATSAPIClient):
         http://developer.mediaocean.com/docs/read/rfp_api/Get_rfp_attachment_by_publicid
         """
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
             'X-MO-User-Id': sender_user_id
         }
         js = self._send_request(
@@ -349,7 +421,6 @@ class PATSBuyer(PATSAPIClient):
         Search for RFPs by advertiser name, campaign ID, RFP dates, response due date and/or status.
         http://developer.mediaocean.com/docs/rfp_api/Search_for_rfps
         """
-        # /agencies/35-1-1W-1/rfps?advertiserName=Jaguar Land Rover&campaignUrn=someUrn&rfpStartDate=2014-08-10&rfpEndDate=2015-01-10&responseDueDate=2015-08-25&status=SENT
         if user_id is None:
             user_id = self.user_id
         if agency_id is None:
@@ -357,12 +428,13 @@ class PATSBuyer(PATSAPIClient):
         if agency_group_id is None:
             agency_group_id = self.agency_group_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
             'X-MO-Organization-Id': agency_id,
             'X-MO-Agency-Group-Id': agency_group_id,
-            'X-MO-User-Id': user_id
+            'X-MO-User-Id': user_id,
+            'X-MO-App': 'prisma'
         }
-        path = '/agencies/%s/rfps' % self.agency_id
+        path = '/rfps'
         if advertiser_name or campaign_urn or rfp_start_date or rfp_end_date or response_due_date or status:
             path += "?"
         if advertiser_name:
@@ -370,9 +442,9 @@ class PATSBuyer(PATSAPIClient):
         if campaign_urn:
             path += "campaignUrn=%s&" % campaign_urn
         if rfp_start_date:
-            path += "rfpStartDate=%s&" % rfp_start_date
+            path += "startDate=%s&" % rfp_start_date
         if rfp_end_date:
-            path += "rfpEndDate=%s&" % rfp_end_date
+            path += "endDate=%s&" % rfp_end_date
         if response_due_date:
             path += "responseDueDate=%s&" % response_due_date
         if status:
@@ -382,6 +454,71 @@ class PATSBuyer(PATSAPIClient):
             "GET",
             AGENCY_API_DOMAIN,
             path,
+            extra_headers
+        )
+        return js
+
+    def list_proposals(self, agency_group_id=None, agency_id=None, rfp_id=None, start_date=None, end_date=None, page=None):
+        """
+        As a buyer, view all proposals I have sent and their status.
+
+        https://developer.mediaocean.com/docs/read/buyer_proposals/List_proposals
+        """
+        if rfp_id is None:
+            raise PATSException("RFP ID is required")
+        if agency_group_id is None:
+            agency_group_id = self.agency_group_id
+        if agency_id is None:
+            agency_id = self.agency_id
+
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.proposal-v1+json',
+            'X-MO-Organization-ID': agency_id,
+            'X-MO-Agency-Group-ID': agency_group_id,
+            'X-MO-User-Id': self.user_id,
+            'X-MO-App': 'prisma'
+        }
+
+        path = '/rfps/%s/proposals?' % rfp_id
+        if start_date:
+            path += "startDate=%s" % start_date.strftime("%Y-%m-%d")
+        if end_date:
+            path += "&endDate=%s" % end_date.strftime("%Y-%m-%d")
+        if page:
+            path += "&page=%s" % page
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        return js
+
+    def view_proposal_detail(self, agency_group_id=None, agency_id=None, user_id=None, proposal_id=None):
+        """
+        Get a single proposal using its public ID.
+
+        https://developer.mediaocean.com/docs/read/buyer_proposals/Get_proposal_details
+        """
+        if proposal_id is None:
+            raise PATSException("Proposal ID is required")
+        if user_id == None:
+            user_id = self.user_id
+        if agency_group_id is None:
+            agency_group_id = self.agency_group_id
+        if agency_id is None:
+            agency_id = self.agency_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.proposal-v1+json',
+            'X-MO-Organization-ID': agency_id,
+            'X-MO-Agency-Group-ID': agency_group_id,
+            'X-MO-User-Id': user_id,
+            'X-MO-App': 'prisma'
+        }
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            "/proposals/%s" % proposal_id,
             extra_headers
         )
         return js
@@ -398,7 +535,7 @@ class PATSBuyer(PATSAPIClient):
         if attachment_id is None:
             raise PATSException("Attachment ID is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
             'X-MO-User-Id': sender_user_id
         }
         js = self._send_request(
@@ -419,7 +556,7 @@ class PATSBuyer(PATSAPIClient):
         if agency_id is None:
             agency_id = self.agency_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfps-v3+json',
+            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
             'X-MO-User-Id': sender_user_id,
             'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': agency_id,
