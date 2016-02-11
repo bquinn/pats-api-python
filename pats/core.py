@@ -37,7 +37,7 @@ import re
 import string
 from urllib import urlencode
 
-VERSION = '0.8' # in-progress update #2 for 2015.8 APIs
+VERSION = '0.9' # update for 2016.1 APIs
 
 RETRY_LIMIT = 3 # number of times to re-try HTTP requests if we get a gateway timeout error
 
@@ -128,7 +128,7 @@ class PATSAPIClient(object):
             response = h.getresponse()
             response_status = response.status
             response_text = response.read()
-            if response_status == 504 and response_text.find("TIMEOUT") != -1:
+            if response_status == 504:
                 # gateway timeout error: sleep then retry (up to retry limit)
                 time.sleep(5)
             else:
@@ -299,72 +299,9 @@ class CampaignDetails(JSONSerializable):
         dict.update({'mediaBudget': media_budget})
         return dict
         
-class InsertionOrderDetails(JSONSerializable):
-    """
-    InsertionOrderDetails - generic attributes of an order (print or digital).
-    """
-    campaign_id = None
-    external_order_id = None
-    external_publisher_order_id = None
-    media_type = None
-    publisher_id = None
-    agency_buyer_first_name = None
-    agency_buyer_last_name = None
-    agency_buyer_email = None
-    order_number = None # not needed?
-    recipient_emails = []
-    # [{"name":"Extra Ts and Cs","content":"Extra Terms and Conditions that apply to the LOreal booking."}],
-    terms_and_conditions = []
-    respond_by_date = None # "2015-01-20"
-    additional_info = None # "",
-    currency = None
-    message = None # "Here's a sample order for the L'Oreal campaign."
-    notify_emails = [] # ":["brendanquinnoz@gmail.com"]
-
-    def __init__(self, *args, **kwargs):
-        self.campaign_id = kwargs.get('campaign_id', '')
-        self.media_type = kwargs.get('media_type', '')
-        self.external_order_id = kwargs.get('external_order_id', '')
-        if len(self.external_order_id) > 32:
-            raise PATSException("Order fails if length of external_order_id is more than 32 characters")
-        self.external_publisher_order_id = kwargs.get('external_order_id', '')
-        if len(self.external_publisher_order_id) > 32:
-            raise PATSException("Order fails if length of external_publisher_order_id is more than 32 characters")
-        self.publisher_id = kwargs.get('publisher_id', '')
-        self.agency_buyer_first_name = kwargs.get('agency_buyer_first_name', '')
-        self.agency_buyer_last_name = kwargs.get('agency_buyer_last_name', '')
-        self.agency_buyer_email = kwargs.get('agency_buyer_email', '')
-        self.order_number = kwargs.get('order_number', '')
-        self.recipient_emails = kwargs.get('recipient_emails', [])
-        # this is actually an array so needs to change
-        self.terms_and_conditions = kwargs.get('terms_and_conditions', [])
-        self.respond_by_date = kwargs.get('respond_by_date', '')
-        self.additional_info = kwargs.get('additional_info', '')
-        self.message = kwargs.get('message', '')
-        self.currency = kwargs.get('currency', 'GBP')
-        self.notify_emails = kwargs.get('notify_emails', [])
-
-    def dict_repr(self):
-        dict = {
-            "externalOrderId":self.external_order_id,
-            "externalPublisherOrderId":self.external_publisher_order_id,
-            "publisherId": self.publisher_id,
-            "agencyBuyerFirstName": self.agency_buyer_first_name,
-            "agencyBuyerLastName": self.agency_buyer_last_name,
-            "agencyBuyerEmail": self.agency_buyer_email,
-            "recipientEmails": self.recipient_emails, # array of strings
-            "termsAndConditions": self.terms_and_conditions, # array of "name" / "content" pairs
-            "respondByDate": self.respond_by_date.strftime("%Y-%m-%d"), 
-            "additionalInfo": self.additional_info, 
-            "message": self.message,
-            "currency": self.currency,
-            "notifyEmails": self.notify_emails # array of strings
-        }
-        return dict
-
 class LineItem(JSONSerializable):
     """
-    Updated for 2015.8
+    Updated for 2016.1
     """
     id = None # PATS-generated ID for the line item
     externalId = None # Third-party ID for the line item
@@ -567,7 +504,7 @@ class LineItemDigital(LineItem):
         'Other',
         # confusion - buyer-side has "Display" and seller side has "Display Standard"
         # among other differences...
-        'Standard', 'RichMedia', 'Mobile', 'Video',
+        'Standard', 'Rich Media', 'Mobile', 'Video',
         'Package','Roadblock', 'Interstitial','In-Game',
         'Social', 'Sponsorship', 'Tablet', 'Text',
         'Custom-Other'
@@ -627,10 +564,13 @@ class LineItemDigital(LineItem):
         if self.getPackageType() != "Package" and self.getPackageType() != "Roadblock":
             dict.update({
                 "servedBy": self.servedBy,
-                "dimensions": self.dimensions,
-                "position": self.position,
                 "target": self.target,
                 "creativeType": self.creativeType,
+            })
+        if self.buyType != "Fee" and self.packageType != "Roadblock" and self.packageType != "Package":
+            dict.update({
+                "dimensions": self.dimensions,
+                "position": self.position
             })
         if self.getPackageType() == "Child":
             dict.update({
