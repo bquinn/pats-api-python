@@ -460,6 +460,34 @@ class PATSSeller(PATSAPIClient):
             extra_headers
         )
         return js
+
+    def get_order_attachment(self, vendor_id=None, user_id=None, order_id=None, attachment_id=None):
+        """
+        Get an attachment for an order (including the PDF of the order itself).
+
+        https://developer.mediaocean.com/docs/read/seller_orders/Get_order_attachment_seller
+        """
+        if vendor_id==None:
+            vendor_id=self.vendor_id # default but can be overridden
+        if user_id == None:
+            user_id = self.user_id
+        if order_id == None:
+            raise PATSException("Order ID is required")
+        if attachment_id == None:
+            raise PATSException("Attachment ID is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-Organization-Id': vendor_id,
+            'X-MO-User-Id': user_id,
+            'X-MO-App': 'pats'
+        }
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            "/orders/%s/attachments/%s" % (order_id, attachment_id),
+            extra_headers
+        )
+        return js
         
     def send_order_revision(self, order_id=None, version=None, user_id=None, comment=None, print_line_items=None, digital_line_items=None):
         """
