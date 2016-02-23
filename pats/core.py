@@ -35,6 +35,7 @@ import json
 import os
 import re
 import string
+import time
 from urllib import urlencode
 
 VERSION = '0.9' # update for 2016.1 APIs
@@ -201,7 +202,7 @@ class PATSAPIClient(object):
                 "Bad Request. The parameters you provided did not validate. Full response: %s" % reason)
         elif error_code == 401:
             raise PATSException(
-                "%s (Possibly invalid API key) %s" % (reason, self.api_key))
+                "%s (Possibly invalid API key %s)" % (reason, self.api_key))
         elif error_code == 404:
             raise PATSException(
                 "Not found: %s" % reason)
@@ -578,10 +579,17 @@ class LineItemDigital(LineItem):
             })
         else:
             # not a package child so it has a flight start and end date
-            dict.update({
-                "flightStartDate": self.flightStartDate.strftime("%Y-%m-%d"),
-                "flightEndDate": self.flightEndDate.strftime("%Y-%m-%d"),
-            })
+            if isinstance(self.flightStartDate, datetime.date):
+                dict.update({
+                    "flightStartDate": self.flightStartDate.strftime("%Y-%m-%d"),
+                    "flightEndDate": self.flightEndDate.strftime("%Y-%m-%d"),
+                })
+            else:
+                # this is the case when we're turning a proposal into an order - we just have YYYY-MM-DD dates
+                dict.update({
+                    "flightStartDate": self.flightStartDate,
+                    "flightEndDate": self.flightEndDate
+                })
         if self.flighting:
             dict.update({
                 "flighting": self.flighting
