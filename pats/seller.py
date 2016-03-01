@@ -621,7 +621,7 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
-    def list_rfps(self, start_date=None, end_date=None, page=None):
+    def list_rfps(self, start_date=None, end_date=None, page_size=None, page=None):
         """
         As a seller, view all RFPs from buyers.
 
@@ -638,6 +638,8 @@ class PATSSeller(PATSAPIClient):
             path += "startDate=%s" % start_date.strftime("%Y-%m-%d")
         if end_date:
             path += "&endDate=%s" % end_date.strftime("%Y-%m-%d")
+        if page_size:
+            path += "&page_size=%s" % page_size
         if page:
             path += "&page=%s" % page
         js = self._send_request(
@@ -647,6 +649,22 @@ class PATSSeller(PATSAPIClient):
             extra_headers
         )
         return js
+
+    def list_all_rfps(self, start_date=None, end_date=None):
+        """
+        Loop over the list_rfps method until we definitely have all RFPs in an array
+        """
+        page_size = 25
+        page = 1
+        full_json_list = []
+        remaining_content = True
+        while (remaining_content):
+            partial_json_list = self.list_rfps(start_date=start_date, end_date=end_date, page_size=page_size, page=page)
+            full_json_list.extend(partial_json_list)
+            page = page + 1
+            remaining_content = (len(partial_json_list) == page_size)
+
+        return full_json_list
 
     def list_proposals(self, rfp_id=None):
         """
@@ -723,36 +741,50 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
-    def get_rfp_attachment(self, agency_id=None, rfp_id=None, attachment_id=None):
+    def get_rfp_attachment(self, organization_id=None, user_id=None, rfp_id=None, attachment_id=None):
         """
         Retrieve an attachment to an RFP based on its ID.
-        Broken, raised as PATS-953
 
-        http://developer.mediaocean.com/docs/read/rfp_api/Get_rfp_attachment_by_publicid
+        https://developer.mediaocean.com/docs/read/seller_proposals/Get_RFP_attachment
         """
-        if agency_id == None:
-            raise PATSException("Agency ID is required")
         if rfp_id == None:
             raise PATSException("RFP ID is required")
         if attachment_id == None:
             raise PATSException("Attachment ID is required")
+        if user_id == None:
+            user_id = self.user_id
+        if organization_id is None:
+            organization_id = self.vendor_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfps-v3+json'
+            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
+            'X-MO-Organization-ID': organization_id,
+            'X-MO-User-Id': user_id,
+            'X-MO-App': 'pats'
         }
 
         js = self._send_request(
             "GET",
             PUBLISHER_API_DOMAIN,
-            "/agencies/%s/rfps/%s/attachments/%s" % (agency_id, rfp_id, attachment_id),
+            "/rfps/%s/attachments/%s" % (rfp_id, attachment_id),
             extra_headers
         )
         return js
 
-    def send_proposal(self, user_id=None, rfp_id=None, proposal_external_id=None, proposal_comments=None, digital_line_items=None, print_line_items=None, attachments=None):
+    def send_proposal(self, user_id=None, rfp_id=None, proposal_id=None, proposal_external_id=None, proposal_comments=None, digital_line_items=None, print_line_items=None, attachments=None):
         """
         As a seller, send a proposal in response to a buyer's RFP.
 
-        http://developer.mediaocean.com/docs/read/proposals_api/Send_proposal
+        rfp_id: ID of the RFP you are responding to
+        proposal_id (optional): Will treat this action as "re-sending" a new version of an existing proposal
+        proposal_external_id: A new, unique ID to assign to the proposal
+        proposal_comments: A text message sent to the buyer along with the proposal
+        digital_line_items: Digital line items to be sent as part of proposal
+        print_line_items: Print line items to be sent as part of proposal
+        (Note that unlike orders, proposals can have both print and digital line items)
+        attachments (optional): Data for any files to be attached to the proposal
+
+        https://developer.mediaocean.com/docs/read/seller_proposals/Send_proposal
+        https://developer.mediaocean.com/docs/read/seller_proposals/Revise_proposal
         """
 
         digital_line_items_obj = []
@@ -772,21 +804,25 @@ class PATSSeller(PATSAPIClient):
             "attachments" : attachments
         }
 
-        return self.send_proposal_raw(user_id=user_id, vendor_id=self.vendor_id, rfp_id=rfp_id, data=data)
+        return self.send_proposal_raw(user_id=user_id, vendor_id=self.vendor_id, rfp_id=rfp_id, proposal_id=proposal_id, data=data)
 
-    def send_proposal_raw(self, user_id=None, vendor_id=None, rfp_id=None, data=None):
+    def send_proposal_raw(self, user_id=None, vendor_id=None, rfp_id=None, proposal_id=None, data=None):
         """
         As a seller, send a proposal in response to a buyer's RFP using a raw payload
         Used directly by API tester app.
 
+        rfp_id: ID of the RFP you are responding to
+        proposal_id (optional): Will treat this action as "re-sending" a new version of an existing proposal
+
         https://developer.mediaocean.com/docs/read/seller_proposals/Send_proposal
+        https://developer.mediaocean.com/docs/read/seller_proposals/Revise_proposal
         """
         if user_id == None:
             user_id = self.user_id
         if vendor_id == None:
             raise PATSException("Vendor (aka publisher) ID is required")
-        if rfp_id == None:
-            raise PATSException("RFP ID is required")
+        if rfp_id == None and proposal_id == None:
+            raise PATSException("Either RFP ID (for a new proposal) or Proposal ID (for a proposal revision) is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.proposal-v1+json',
             'X-MO-Organization-Id': vendor_id,
@@ -794,10 +830,16 @@ class PATSSeller(PATSAPIClient):
             'X-MO-App': 'pats'
         }
 
+        path = ''
+        if rfp_id:
+            path = "/rfps/%s/proposals" % rfp_id
+        elif proposal_id:
+            path = "/proposals/%s" % proposal_id
+
         proposal_uri = self._send_request(
             "POST",
             PUBLISHER_API_DOMAIN,
-            "/rfps/%s/proposals" % rfp_id,
+            path,
             extra_headers,
             json.dumps(data)
         )
@@ -834,4 +876,31 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
+    def get_proposal_attachment(self, user_id=None, vendor_id=None, proposal_id=None, attachment_id=None):
+        """
+        Get contents of proposal attachment based on the proposal ID.
+
+        https://developer.mediaocean.com/docs/read/seller_proposals/Get_proposal_attachment
+        """
+        if user_id is None:
+            user_id = self.user_id
+        if vendor_id is None:
+            vendor_id = self.vendor_id
+        if proposal_id is None:
+            raise PATSException("Proposal ID is required")
+        if attachment_id is None:
+            raise PATSException("Attachment ID is required")
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.proposal-v1+json',
+            'X-MO-Organization-ID': vendor_id,
+            'X-MO-User-Id': user_id,
+            'X-MO-App': 'pats'
+        }
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            "/proposals/%s/attachments/%s" % (proposal_id, attachment_id),
+            extra_headers
+        )
+        return js
 
