@@ -34,11 +34,12 @@ import datetime
 import json
 import os
 import re
+from socket import gaierror
 import string
 import time
 from urllib import urlencode
 
-VERSION = '0.9' # update for 2016.1 APIs
+VERSION = '0.10' # update for 2016.2 APIs
 
 RETRY_LIMIT = 3 # number of times to re-try HTTP requests if we get a gateway timeout error
 
@@ -121,11 +122,14 @@ class PATSAPIClient(object):
         # Perform the request (with retries) and get the response headers and content
         retries = RETRY_LIMIT; response = ''; response_status = 0; response_text = ''
         for n in range(retries):
-            h.request(method,
+            try:
+                h.request(method,
                   path,
                   body,
                   headers)
-            
+            except gaierror: # if we got a socket exception, try again
+                time.sleep(5)
+                continue
             response = h.getresponse()
             response_status = response.status
             response_text = response.read()
@@ -322,7 +326,7 @@ class LineItem(JSONSerializable):
     comments = None
     rate = 0.0 # dd.dddd,
     cost = 0.0 # dddd.dddd, (= units * rate based on costmethod, eg CPM is / 1000)
-    mediaProperty = "" # site or publication
+    freeFormMediaProperty = "" # site or publication
 
     def getvar(self, varname, default, args, kwargs):
         """
@@ -353,7 +357,7 @@ class LineItem(JSONSerializable):
         self.comments = self.getvar('comments', '', args, kwargs)
         self.campaignId = self.getvar('campaignId', None, args, kwargs)
         self.supplierPlacementParentReference = self.getvar('supplierPlacementParentReference', None, args, kwargs)
-        self.mediaProperty = self.getvar('mediaProperty', None, args, kwargs)
+        self.freeFormMediaProperty = self.getvar('freeFormMediaProperty', None, args, kwargs)
 
     def getPackageType(self):
         return None
@@ -365,7 +369,7 @@ class LineItem(JSONSerializable):
             "packageType": self.packageType,
             "comments": self.comments,
             "supplierPlacementParentReference": self.supplierPlacementParentReference,
-            "mediaProperty": self.mediaProperty
+            "freeFormMediaProperty": self.freeFormMediaProperty
         }
         packageType = self.getPackageType()
         if packageType != "Roadblock" and packageType != "Package":

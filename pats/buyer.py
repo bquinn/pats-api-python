@@ -276,10 +276,8 @@ class PATSBuyer(PATSAPIClient):
         # with a dict for multiple publishers
         if publisher_id and publisher_emails:
             data.update({
-                'publisherRecipient': {
-                    'publisherPublicId': publisher_id,
-                    'emails': publisher_emails,
-                }
+                'vendorId': publisher_id,
+                'recipients': publisher_emails,
             })
         elif publishers:
             data.update({

@@ -621,6 +621,31 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
+    def compare_order_versions(self, user_id=None, order_id=None, majorVersion=None, minorVersion=None):
+        """
+        Return difference between the specified version and the previous version.
+
+        https://developer.mediaocean.com/docs/read/seller_orders/Compare_order_seller
+        """
+        if user_id == None:
+            raise PATSException("User ID (seller email) is required")
+        if order_id == None:
+            raise PATSException("Order ID is required")
+        if vendor_id == None:
+            vendor_id = self.vendor_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'X-MO-Organization-Id': vendor_id,
+            'X-MO-User-Id': self.user_id,
+            'X-MO-App': 'pats'
+        }
+        path = '/orders/%s?operation=compareToPrevious' % order_id
+        if start_date:
+            path += "startDate=%s" % start_date.strftime("%Y-%m-%d")
+        if end_date:
+            path += "&endDate=%s" % end_date.strftime("%Y-%m-%d")
+ 
+
     def list_rfps(self, start_date=None, end_date=None, page_size=None, page=None):
         """
         As a seller, view all RFPs from buyers.
@@ -831,24 +856,26 @@ class PATSSeller(PATSAPIClient):
         }
 
         path = ''
-        if rfp_id:
-            path = "/rfps/%s/proposals" % rfp_id
-        elif proposal_id:
+        if proposal_id:
             path = "/proposals/%s" % proposal_id
+        elif rfp_id:
+            path = "/rfps/%s/proposals" % rfp_id
 
         proposal_uri = self._send_request(
-            "POST",
+            "PUT" if proposal_id else "POST",
             PUBLISHER_API_DOMAIN,
             path,
             extra_headers,
             json.dumps(data)
         )
 
-        match = re.search('https?://(.+)?/rfps/(.+?)/proposals/(.+?)$', proposal_uri)
-        proposal_id = None
+        match = re.search('https?://(.+)?/proposals/(.+?)$', proposal_uri)
+        new_proposal_id = None
         if match:
-            proposal_id = match.group(3)
-        return proposal_id
+            new_proposal_id = match.group(2)
+        if proposal_id and not new_proposal_id:
+            new_proposal_id = proposal_id
+        return new_proposal_id
 
     def view_proposal_detail(self, organization_id=None, user_id=None, proposal_id=None):
         """
