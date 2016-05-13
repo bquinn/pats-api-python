@@ -79,6 +79,11 @@ class PATSBuyer(PATSAPIClient):
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.security-v1+json',
             'X-MO-User-ID': user_id
+            # stuff like this will be needed for 2016.3
+            # 'X-MO-App': 'prisma',
+            # 'X-MO-Agency-Group-ID': self.agency_group_id,
+            # 'X-MO-Organization-ID': organisation_id,
+            # 'X-MO-User-ID': user_id
         }
         path = '/vendors?agencyId=%s' % self.agency_id
         js = self._send_request(
@@ -107,7 +112,7 @@ class PATSBuyer(PATSAPIClient):
         if name:
             path += "&name=%s" % name
         if last_updated_date:
-            path += "&lastUpdatedDate=%s" % last_updated_date
+            path += "&updatedAfter=%s" % last_updated_date
         js = self._send_request(
             "GET",
             AGENCY_API_DOMAIN,
@@ -1077,5 +1082,42 @@ class PATSBuyer(PATSAPIClient):
             "/campaigns/%s/orders/%s/versions/%s/requestRevision" % (campaign_id, order_id, version),
             extra_headers,
             json.dumps(data)
+        )
+        return js
+
+    def reprocess_events(self, since_date=None, agency_group_id=None, agency_id=None, user_id=None, *args, **kwargs):
+        """
+        Request that the PATS Push API re-send all event notifications from a given date/time.
+
+        https://developer.mediaocean.com/docs/read/event_notification/Buyer_reprocess_event_notifications
+
+        Inputs:
+        - since_date: Python datetime
+        """
+        if since_date == None:
+            raise PATSException("since_date is required")
+        if not isinstance(since_date, datetime.datetime) and not (isinstance(since_date, datetime.date)):
+            raise PATSException("Since date must be a Python date or datetime object")
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
+        if agency_id == None:
+            agency_id = self.agency_id
+        if user_id == None:
+            user_id = self.user_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.eventnotification-v1+json',
+            'X-MO-App': 'prisma',
+            'X-MO-Agency-Group-ID': agency_group_id,
+            'X-MO-Organization-ID': agency_id,
+            'X-MO-User-ID': user_id
+        }
+        since_date_string = since_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        # TODO: allow for list of emails
+        js = self._send_request(
+            "POST",
+            AGENCY_API_DOMAIN,
+            "/eventnotifications?operation=reprocess&since=%s" % (since_date_string),
+            extra_headers
         )
         return js
