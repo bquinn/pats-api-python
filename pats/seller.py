@@ -283,6 +283,35 @@ class PATSSeller(PATSAPIClient):
 
         return self.save_product_data(data)
 
+    def get_buyers(self, user_id=None, agency_id=None, name=None, last_updated_date=None):
+        """
+        As a buyer user, list the details of all agencies I represent.
+        http://developer.mediaocean.com/docs/read/organization_api/Get_agency
+        """
+        if user_id == None:
+            user_id = self.user_id
+        #if agency_id == None:
+        #    # use default agency ID if none specified
+        #    agency_id = self.agency_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.security-v1+json',
+            'X-MO-User-ID': user_id,
+        }
+        path = '/agencies?'
+        if agency_id:
+            path += "agencyId=%s" % agency_id
+        if name:
+            path += "&name=%s" % name
+        if last_updated_date:
+            path += "&updatedAfter=%s" % last_updated_date
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        return js
+
     def list_orders(self, since_date=None, page_size=25, page=1):
         """
         As a seller, view all orders that are available to me.
