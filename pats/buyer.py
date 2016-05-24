@@ -68,22 +68,22 @@ class PATSBuyer(PATSAPIClient):
         self.agency_group_id = agency_group_id
         self.user_id = user_id
 
-    def get_sellers(self, user_id=None):
+    def get_sellers(self, agency_id=None, user_id=None):
         """
         As a buyer, view all the sellers for which I have access to send orders.
         http://developer.mediaocean.com/docs/read/organization_api/Get_seller_organization
         """
         if user_id == None:
             user_id = self.user_id
+        if agency_id == None:
+            agency_id = self.agency_id
 
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.security-v1+json',
+            'X-MO-App': 'prisma',
+            'X-MO-Agency-Group-ID': self.agency_group_id,
+            'X-MO-Organization-ID': agency_id,
             'X-MO-User-ID': user_id
-            # stuff like this will be needed for 2016.3
-            # 'X-MO-App': 'prisma',
-            # 'X-MO-Agency-Group-ID': self.agency_group_id,
-            # 'X-MO-Organization-ID': organisation_id,
-            # 'X-MO-User-ID': user_id
         }
         path = '/vendors?agencyId=%s' % self.agency_id
         js = self._send_request(
@@ -122,21 +122,29 @@ class PATSBuyer(PATSAPIClient):
         return js
 
 
-    def get_users_for_seller(self, user_id=None, vendor_id=None):
+    def get_users_for_seller(self, agency_id=None, user_id=None, vendor_id=None):
         """
         As a buyer, view all the sellers to whom I can send orders at the
-        given vendor.
+        given vendor. Updated for 2016.3.
+
         http://developer.mediaocean.com/docs/read/organization_api/Get_user
         """
         if user_id == None:
             user_id = self.user_id
+        if agency_id == None:
+            # use default agency ID if none specified
+            agency_id = self.agency_id
         if vendor_id == None:
             raise PATSException("Vendor ID is required")
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.security-v1+json',
-            'X-MO-User-ID': user_id
+            'X-MO-Organization-ID': agency_id,
+            'X-MO-Agency-Group-ID': self.agency_group_id,
+            'X-MO-User-ID': user_id,
+            # this really should be 'X-MO-App': 'prisma' - raised PATS-1183
+            'X-MO-App': 'pats'
         }
-        path = '/users?appName=pats&agencyId=%s&vendorId=%s' % (self.agency_id, vendor_id)
+        path = '/vendors/%s/users' % (vendor_id)
         js = self._send_request(
             "GET",
             AGENCY_API_DOMAIN,

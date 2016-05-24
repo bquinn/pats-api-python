@@ -48,8 +48,7 @@ class PATSSeller(PATSAPIClient):
         Create a new seller-side PATS API object.
 
         Parameters:
-        - vendor_id (required) : ID of the vendor (publisher) whose catalogue
-          you are updating.
+        - vendor_id (required) : ID of the vendor (publisher) on whose behalf you are making the call.
         - user_id (required) : Email of a valid user who is making the request
         - api_key (required) : API Key with seller access
         - debug_mode (boolean) : Output full details of HTTP requests and responses
@@ -283,19 +282,70 @@ class PATSSeller(PATSAPIClient):
 
         return self.save_product_data(data)
 
+    def get_media_property_details(self, user_id=None, organisation_id=None):
+        """
+        New in 2016.3 - get media property fields
+
+        https://developer.mediaocean.com/docs/read/catalog_api/Get_media_property_details
+        """
+        if organisation_id == None:
+            organisation_id = self.vendor_id
+        if user_id == None:
+            user_id = self.user_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.catalog-v1+json',
+            'X-MO-User-ID': user_id,
+            'X-MO-Organization-ID': self.vendor_id,
+            'X-MO-App': 'pats'
+        }
+        # a publisher can query another publisher's properties if they want...
+        path = '/vendors/%s/mediaproperties/fields' % organisation_id
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        return js
+
+    def get_products(self, user_id=None, organisation_id=None):
+        """
+        New in 2016.3 - get products for seller
+
+        https://developer.mediaocean.com/docs/catalog_api/Get_products_seller
+        """
+        if organisation_id == None:
+            organisation_id = self.vendor_id
+        if user_id == None:
+            user_id = self.user_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.catalog-v1+json',
+            'X-MO-User-ID': user_id,
+            'X-MO-Organization-ID': self.vendor_id,
+            'X-MO-App': 'pats'
+        }
+        # a publisher can query another publisher's properties if they want...
+        path = '/vendors/%s/products' % organisation_id
+        js = self._send_request(
+            "GET",
+            PUBLISHER_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        return js
+
     def get_buyers(self, user_id=None, agency_id=None, name=None, last_updated_date=None):
         """
-        As a buyer user, list the details of all agencies I represent.
+        As a seller user, list the details of all agencies I can receive orders from.
+
         http://developer.mediaocean.com/docs/read/organization_api/Get_agency
         """
         if user_id == None:
             user_id = self.user_id
-        #if agency_id == None:
-        #    # use default agency ID if none specified
-        #    agency_id = self.agency_id
         extra_headers = {
             'Accept': 'application/vnd.mediaocean.security-v1+json',
-            'X-MO-User-ID': user_id,
+            'X-MO-Organization-Id': self.vendor_id,
+            'X-MO-User-ID': user_id
         }
         path = '/agencies?'
         if agency_id:

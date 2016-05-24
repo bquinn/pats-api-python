@@ -39,7 +39,7 @@ import string
 import time
 from urllib import urlencode
 
-VERSION = '0.10' # update for 2016.2 APIs
+VERSION = '0.11' # update for 2016.3 APIs
 
 RETRY_LIMIT = 3 # number of times to re-try HTTP requests if we get a gateway timeout error
 
@@ -326,7 +326,7 @@ class LineItem(JSONSerializable):
     comments = None
     rate = 0.0 # dd.dddd,
     cost = 0.0 # dddd.dddd, (= units * rate based on costmethod, eg CPM is / 1000)
-    freeFormMediaProperty = "" # site or publication
+    freeFormMediaProperty = "" # was site/publication
 
     def getvar(self, varname, default, args, kwargs):
         """
@@ -418,16 +418,14 @@ class LineItemPrint(LineItem):
     saleDate = None
     position = None # could merge into generic?
     region = None
-
     # size : {
     size_type = None # "type of print size" - eg "cms"
     size_units =None # - no of units, eg for 25 x 4 would be 100
     size_columns = None # number of columns, eg for 25 x 4 would be 4
     # }
-
-    # publication = None # duplicates mediaProperty?
     positionGuaranteed = None # optional - must be true or false
     includeInDigitalEdition = None # optional - must be true or false
+    serialNumber = None # Spectra serial number
 
     # for validation
     possible_buy_categories_print = [
@@ -443,7 +441,6 @@ class LineItemPrint(LineItem):
 
     def __init__(self, *args, **kwargs):
         super(LineItemPrint, self).__init__(*args, **kwargs)
-        # self.publication = self.getvar('publication', '', args, kwargs)
         self.size_type = self.getvar('size_type', '', args, kwargs)
         self.size_units = self.getvar('size_units', '', args, kwargs)
         self.size_columns = self.getvar('size_columns', '', args, kwargs)
@@ -454,6 +451,7 @@ class LineItemPrint(LineItem):
         self.region = self.getvar('region', '', args, kwargs)
         self.positionGuaranteed = self.getvar('positionGuaranteed', False, args, kwargs)
         self.includeInDigitalEdition = self.getvar('includeInDigitalEdition', False, args, kwargs)
+        self.serialNumber = self.getvar('serialNumber', None, args, kwargs)
 
         # validation
         if self.buyCategory not in self.possible_buy_categories_print:
@@ -485,6 +483,10 @@ class LineItemPrint(LineItem):
                     'units': self.size_units,
                     'columns': self.size_columns
                 })
+        if self.serialNumber:
+            dict.update({
+                'serialNumber': self.serialNumber
+            })
         return dict
 
 class LineItemDigital(LineItem):
@@ -498,7 +500,7 @@ class LineItemDigital(LineItem):
     creativeType = None
     flightStartDate = None
     flightEndDate = None
-    flighting = None # [ { month, year, units }]
+    flighting = None # [ { month, year, units, serialNumber }]
 
     # for validation
     # see http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#buy_categories
@@ -595,6 +597,7 @@ class LineItemDigital(LineItem):
                     "flightEndDate": self.flightEndDate
                 })
         if self.flighting:
+            # pass flighting section straight through
             dict.update({
                 "flighting": self.flighting
             })
