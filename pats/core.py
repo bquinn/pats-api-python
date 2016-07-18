@@ -501,6 +501,7 @@ class LineItemDigital(LineItem):
     flightStartDate = None
     flightEndDate = None
     flighting = None # [ { month, year, units, serialNumber }]
+    serialNumber = None # Spectra serial number
 
     # for validation
     # see http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#buy_categories
@@ -548,6 +549,7 @@ class LineItemDigital(LineItem):
         self.target = self.getvar('target', None, args, kwargs)
         self.creativeType = self.getvar('creativeType', None, args, kwargs)
         self.flighting = self.getvar('flighting', None, args, kwargs)
+        self.serialNumber = self.getvar('serialNumber', None, args, kwargs)
 
         # validation
         #if self.servedBy not in self.possible_servedby:
@@ -601,6 +603,10 @@ class LineItemDigital(LineItem):
             dict.update({
                 "flighting": self.flighting
             })
+        if self.serialNumber:
+            dict.update({
+                'serialNumber': self.serialNumber
+            })
         return dict
 
 class InsertionOrderLineItemDigital(LineItemDigital):
@@ -614,3 +620,118 @@ class InsertionOrderLineItemPrint(LineItemPrint):
 
 class ProposalLineItemPrint(LineItemPrint):
     pass
+
+class Product(JSONSerializable):
+    """
+    New style of product added in 2016.3
+    """
+    id = None               # PATS-generated ID for the product
+    productId = None        # Third-party ID for the product
+    status = None           # ACTIVE or INACTIVE
+    name = None             # Name of the product (line item)
+    mediaType = None        # "PRINT" or "DIGITAL"
+    mediaPropertyId = None  # ID of Media Property (as defined in Admin area of the publication) (optional)
+    currencyCode = None     # Default currency code of order - optional, defaults to GBP (??)
+    section = None          # section (optional)
+    subsection = None       # subsection (optional)
+
+    def __init__(self, *args, **kwargs):
+        self.id = kwargs.get('id', None)
+        self.productId = kwargs.get('productId', None)
+        self.status = kwargs.get('status', None)
+        self.name = kwargs.get('name', None)
+        self.mediaType = kwargs.get('mediaType', None)
+        self.mediaPropertyId = kwargs.get('mediaPropertyId', None)
+        self.clientId = kwargs.get('clientId', None)
+        self.currencyCode = kwargs.get('currencyCode', None)
+        self.section = kwargs.get('section', None)
+        self.subsection = kwargs.get('subsection', None)
+        self.size = kwargs.get('size', None)
+        self.dimensions = kwargs.get('dimensions', None)
+        self.cost = kwargs.get('cost', None)
+        self.rate = kwargs.get('rate', None)
+        self.units = kwargs.get('units', None)
+        self.costMethod = kwargs.get('costMethod', None)
+        self.unitType = kwargs.get('unitType', None)
+        self.buyType = kwargs.get('buyType', None)
+        self.buyCategory = kwargs.get('buyCategory', None)
+
+    def dict_repr(self):
+        dict = {}
+        if self.id:
+            dict.update({
+                "id": self.id
+            })
+        if self.productId:
+            dict.update({
+                "productId": self.productId
+            })
+        if self.status:
+            dict.update({
+                "status": self.status
+            })
+        if self.name:
+            dict.update({
+                "name": self.name
+            })
+        if self.mediaType:
+            dict.update({
+                "mediaType": self.mediaType
+            })
+        if self.mediaPropertyId:
+            dict.update({
+                "mediaPropertyId": self.mediaPropertyId
+            })
+        if self.clientId:
+            dict.update({
+                "clientId": self.clientId
+            })
+        if self.currencyCode:
+            dict.update({
+                "currencyCode": self.currencyCode
+            })
+        if self.section:
+            dict.update({
+                "section": self.section
+            })
+        if self.subsection:
+            dict.update({
+                "subsection": self.subsection
+            })
+        if self.size:
+            dict.update({
+                "size": self.size
+            })
+        if self.dimensions:
+            dict.update({
+                "dimensions": self.dimensions
+            })
+        if self.cost:
+            dict.update({
+                "cost": self.cost
+            })
+        if self.rate:
+            dict.update({
+                "rate": self.rate
+            })
+        if self.units:
+            dict.update({
+                "units": self.units
+            })
+        if self.costMethod:
+            dict.update({
+                "costMethod": self.costMethod
+            })
+        if self.unitType:
+            dict.update({
+                "unitType": self.unitType
+            })
+        if self.buyType:
+            dict.update({
+                "buyType": self.buyType
+            })
+        if self.buyCategory:
+            dict.update({
+                "buyCategory": self.buyCategory
+            })
+        return dict
