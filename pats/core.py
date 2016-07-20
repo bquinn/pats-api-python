@@ -632,8 +632,11 @@ class Product(JSONSerializable):
     mediaType = None        # "PRINT" or "DIGITAL"
     mediaPropertyId = None  # ID of Media Property (as defined in Admin area of the publication) (optional)
     currencyCode = None     # Default currency code of order - optional, defaults to GBP (??)
+    agencyEnabled = None    # Whether agencies can see it - 0 or 1 bizarrely?!
     section = None          # section (optional)
     subsection = None       # subsection (optional)
+    position = None         # position (optional)
+    positionGuaranteed = None # is the position guaranteed (optional - basically it's never "Yes" for our publishers)
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get('id', None)
@@ -644,9 +647,11 @@ class Product(JSONSerializable):
         self.mediaPropertyId = kwargs.get('mediaPropertyId', None)
         self.clientId = kwargs.get('clientId', None)
         self.currencyCode = kwargs.get('currencyCode', None)
+        self.agencyEnabled = kwargs.get('agencyEnabled', None)
         self.section = kwargs.get('section', None)
         self.subsection = kwargs.get('subsection', None)
         self.size = kwargs.get('size', None)
+        self.position = kwargs.get('position', None)
         self.dimensions = kwargs.get('dimensions', None)
         self.cost = kwargs.get('cost', None)
         self.rate = kwargs.get('rate', None)
@@ -655,9 +660,12 @@ class Product(JSONSerializable):
         self.unitType = kwargs.get('unitType', None)
         self.buyType = kwargs.get('buyType', None)
         self.buyCategory = kwargs.get('buyCategory', None)
+        self.positionGuaranteed = kwargs.get('positionGuaranteed', None)
+        self.comments = kwargs.get('comments', None)
 
     def dict_repr(self):
         dict = {}
+        attributes = {}
         if self.id:
             dict.update({
                 "id": self.id
@@ -682,56 +690,76 @@ class Product(JSONSerializable):
             dict.update({
                 "mediaPropertyId": self.mediaPropertyId
             })
-        if self.clientId:
-            dict.update({
-                "clientId": self.clientId
-            })
         if self.currencyCode:
             dict.update({
                 "currencyCode": self.currencyCode
             })
-        if self.section:
+        if self.agencyEnabled:
             dict.update({
+                "agencyEnabled": self.agencyEnabled
+            })
+        if self.clientId:
+            dict.update({
+                "clientId": self.clientId
+            })
+        if self.section:
+            attributes.update({
                 "section": self.section
             })
         if self.subsection:
-            dict.update({
+            attributes.update({
                 "subsection": self.subsection
             })
         if self.size:
-            dict.update({
+            attributes.update({
                 "size": self.size
             })
+        if self.position:
+            attributes.update({
+                "position": self.position
+            })
         if self.dimensions:
-            dict.update({
+            attributes.update({
                 "dimensions": self.dimensions
             })
         if self.cost:
-            dict.update({
+            attributes.update({
                 "cost": self.cost
             })
         if self.rate:
-            dict.update({
+            attributes.update({
                 "rate": self.rate
             })
         if self.units:
-            dict.update({
+            attributes.update({
                 "units": self.units
             })
         if self.costMethod:
-            dict.update({
+            attributes.update({
                 "costMethod": self.costMethod
             })
         if self.unitType:
-            dict.update({
+            attributes.update({
                 "unitType": self.unitType
             })
         if self.buyType:
-            dict.update({
+            attributes.update({
                 "buyType": self.buyType
             })
         if self.buyCategory:
-            dict.update({
+            attributes.update({
                 "buyCategory": self.buyCategory
+            })
+        if self.positionGuaranteed:
+            attributes.update({
+                "positionGuaranteed": self.positionGuaranteed
+            })
+        if self.comments:
+            attributes.update({
+                "comments": self.comments
+            })
+        if attributes:
+            dict.update({
+                "attributes": attributes
             })
         return dict
