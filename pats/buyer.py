@@ -636,7 +636,41 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def list_products(self, vendor_id=None, user_id=None, start_index=None, max_results=None, include_logo=False):
+    def list_products(self, user_id=None, agency_id=None, agency_group_id=None, vendor_id=None):
+        """
+        New in 2016.4 - get publisher's products
+        Only shows products that the vendor has chosen to share with this agency
+
+        https://developer.mediaocean.com/docs/buyer_catalog/Get_products_buyer
+        """
+        # "vendor_id" is the one being requested
+        if vendor_id == None:
+            raise PATSException("Vendor id is required")
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
+        if agency_id == None:
+            agency_id = self.agency_id
+        if user_id == None:
+            user_id = self.user_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.catalog-v1+json',
+            'X-MO-User-ID': user_id,
+            'X-MO-Agency-Group-ID': self.agency_group_id,
+            'X-MO-Organization-ID': self.agency_id,
+            'X-MO-App': 'prisma'
+        }
+        # a publisher can query another publisher's properties if they want...
+        path = '/vendors/%s/products' % vendor_id
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            path,
+            extra_headers
+        )
+        return js
+
+
+    def old_list_products(self, vendor_id=None, user_id=None, start_index=None, max_results=None, include_logo=False):
         """
         List products in a vendor's product catalogue.
 
@@ -675,6 +709,35 @@ class PATSBuyer(PATSAPIClient):
         )
         # result looks like
         # {"total":117,"products":[{"vendorPublicId":"35-EEBMG4J-4","productPublicId":"PC-11TU", ... }
+        return js
+
+    def get_media_property_details(self, user_id=None, agency_group_id=None, agency_id=None):
+        """
+        List a vendor's media property fields and field restrictions.
+
+        https://developer.mediaocean.com/docs/buyer_catalog/Get_media_property_details_buyer
+        """
+        if agency_id == None:
+            agency_id = self.agency_id
+        if agency_group_id == None:
+            agency_group_id = self.agency_group_id
+        if user_id == None:
+            user_id = self.user_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.catalog-v1+json',
+            'X-MO-User-ID': user_id,
+            'X-MO-Agency-Group-ID': self.agency_group_id,
+            'X-MO-Organization-ID': self.agency_id,
+            'X-MO-App': 'prisma'
+        }
+        # a publisher can query another publisher's properties if they want...
+        path = '/vendors/%s/mediaproperties/fields' % organisation_id
+        js = self._send_request(
+            "GET",
+            AGENCY_API_DOMAIN,
+            path,
+            extra_headers
+        )
         return js
 
     def send_order(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, media_type=None, currency_code=None, external_order_id=None, vendor_id=None, recipient_emails=None, buyer_dict=None, notify_emails=None, additional_info=None, order_comment=None, respond_by_date=None, terms_and_conditions_name=None, terms_and_conditions_content=None, digital_line_items=None, print_line_items=None, order_id=None, **kwargs):
