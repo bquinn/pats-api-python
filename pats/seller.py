@@ -308,6 +308,37 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
+    def update_media_property_fields(self, user_id=None, organisation_id=None, media_property_id=None, field_family=None, payload=None):
+        """
+        New in 2016.3 - update media property fields (for a given field family)
+
+        https://developer.mediaocean.com/docs/catalog_api/Update_media_property_seller
+        """
+        if organisation_id == None:
+            organisation_id = self.vendor_id
+        if media_property_id == None:
+            raise PATSException("media_property_id is required")
+        if field_family == None:
+            raise PATSException("field_family is required")
+        if user_id == None:
+            user_id = self.user_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.catalog-v1+json',
+            'X-MO-User-ID': user_id,
+            'X-MO-Organization-ID': self.vendor_id,
+            'X-MO-App': 'pats'
+        }
+        # can a publisher update another publisher's properties if they want...? TODO check permissions
+        path = '/vendors/%s/mediaproperties/%s/%s' % (organisation_id, media_property_id, field_family)
+        js = self._send_request(
+            "PUT",
+            PUBLISHER_API_DOMAIN,
+            path,
+            extra_headers,
+            json.dumps(payload)
+        )
+        return js
+
     def list_products(self, user_id=None, organisation_id=None):
         """
         New in 2016.3 - get products for seller
@@ -333,6 +364,39 @@ class PATSSeller(PATSAPIClient):
             PUBLISHER_API_DOMAIN,
             path,
             extra_headers
+        )
+        return js
+
+    def create_product(self, user_id=None, organisation_id=None, product=None):
+        """
+        New in 2016.3 - create product for seller
+
+        https://developer.mediaocean.com/docs/catalog_api/Create_products_seller
+        """
+        if organisation_id == None:
+            organisation_id = self.vendor_id
+        if user_id == None:
+            user_id = self.user_id
+        if type(product) != Product:
+            user_id = self.user_id
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.catalog-v1+json',
+            'X-MO-User-ID': user_id,
+            'X-MO-Organization-ID': self.vendor_id,
+            'X-MO-App': 'pats'
+        }
+        # the product data to be updated
+        data = product.dict_repr()
+
+        # a publisher can query another publisher's properties if they want...
+        path = '/vendors/%s/products' % (organisation_id, product_id)
+
+        js = self._send_request(
+            "POST",
+            PUBLISHER_API_DOMAIN,
+            path,
+            extra_headers,
+            json.dumps(data)
         )
         return js
 
