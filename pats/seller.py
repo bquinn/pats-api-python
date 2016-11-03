@@ -298,7 +298,7 @@ class PATSSeller(PATSAPIClient):
             'X-MO-Organization-ID': self.vendor_id,
             'X-MO-App': 'pats'
         }
-        # a publisher can query another publisher's properties if they want...
+        # a publisher can query another publisher's properties if they are allowed
         path = '/vendors/%s/mediaproperties/fields' % organisation_id
         js = self._send_request(
             "GET",
@@ -367,11 +367,13 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
-    def create_product(self, user_id=None, organisation_id=None, product=None):
+    def create_product(self, user_id=None, organisation_id=None, product=None, products=None):
         """
         New in 2016.3 - create product for seller
 
         https://developer.mediaocean.com/docs/catalog_api/Create_products_seller
+
+        Can pass either "product" (a single Product) or "products" (an array of Products)
         """
         if organisation_id == None:
             organisation_id = self.vendor_id
@@ -386,10 +388,15 @@ class PATSSeller(PATSAPIClient):
             'X-MO-App': 'pats'
         }
         # the product data to be updated
-        data = product.dict_repr()
+        data = ''
+        if product:
+            data = [ product.dict_repr() ]
+        elif products:
+            data = products.dict_repr()
+        else:
+            raise PATSException('Either a single "product" or an array of "products" is required')
 
-        # a publisher can query another publisher's properties if they want...
-        path = '/vendors/%s/products' % (organisation_id, product_id)
+        path = '/vendors/%s/products' % (organisation_id)
 
         js = self._send_request(
             "POST",
@@ -398,7 +405,23 @@ class PATSSeller(PATSAPIClient):
             extra_headers,
             json.dumps(data)
         )
-        return js
+        # this method returns 200 OK for anything :-( Raised bug PATS-1248
+        # success looks like: [{"index":0,"status":"SUCCESS","id":"874a21af-6cef-42e4-933e-c57a3162c9cb"}]
+        # failure looks like: [{"index":0,"status":"FAILURE","errors":[{"field":"mediaPropertyId","key":"productMediaPropertyIdInvalid_validation_message"}]}]
+        # so we have to catch errors ourselves...
+        if js[0]['status'] == "FAILURE":
+            error_string = "Error: "
+            errors = []
+            for error in js[0]['errors']:
+                error_string = ''
+                if 'field' in error:
+                    error_string += error['field']+": "
+                error_string += error['key']
+                errors.append(error_string)
+            full_error_string = ','.join(errors)
+            raise PATSException(full_error_string)
+        else:
+            return js[0]['id']
 
     def update_product(self, user_id=None, organisation_id=None, product_id=None, product=None):
         """
@@ -466,6 +489,7 @@ class PATSSeller(PATSAPIClient):
     def list_orders(self, since_date=None, page_size=25, page=1):
         """
         As a seller, view all orders that are available to me.
+        Now using v2 API which gives custom fields (eg copy splits)
 
         http://developer.mediaocean.com/docs/read/seller_orders/Find_orders_seller
         """
@@ -473,7 +497,7 @@ class PATSSeller(PATSAPIClient):
             raise PATSException("Since date is required")
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-Organization-Id': self.vendor_id,
             'X-MO-User-Id': self.user_id,
             'X-MO-App': 'pats'
@@ -508,6 +532,7 @@ class PATSSeller(PATSAPIClient):
     def list_order_versions(self, campaign_id=None, order_id=None, user_id=None, vendor_id=None):
         """
         As a seller, view a list of all versions of an order
+        Now using v2 of the API which gives custom fields eg copy splits
 
         http://developer.mediaocean.com/docs/seller_orders/List_order_versions_seller
         """
@@ -520,7 +545,7 @@ class PATSSeller(PATSAPIClient):
         if vendor_id == None:
             vendor_id = self.vendor_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-Organization-Id': vendor_id,
             'X-MO-User-Id': self.user_id,
             'X-MO-App': 'pats'
@@ -546,7 +571,7 @@ class PATSSeller(PATSAPIClient):
         if version == None:
             raise PATSException("Version is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-Organization-Id': self.vendor_id,
             'X-MO-User-Id': self.user_id,
             'X-MO-App': 'pats'
@@ -577,7 +602,7 @@ class PATSSeller(PATSAPIClient):
         if vendor_id == None:
             vendor_id = self.vendor_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-Organization-Id': vendor_id,
             'X-MO-User-Id': self.user_id,
             'X-MO-App': 'pats'
@@ -593,6 +618,7 @@ class PATSSeller(PATSAPIClient):
     def view_order_revision_detail(self, order_id=None, version=None, revision=None):
         """
         As a seller, view detail of a particular revision of a version of an order.
+        Now using v2 of the API which returns custom fields eg copy splits.
 
         https://developer.mediaocean.com/docs/read/seller_orders/Get_order_rev_details_seller
         """
@@ -603,7 +629,7 @@ class PATSSeller(PATSAPIClient):
         if revision == None:
             raise PATSException("Revision is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-Organization-Id': self.vendor_id,
             'X-MO-User-Id': self.user_id,
             'X-MO-App': 'pats'
@@ -619,6 +645,7 @@ class PATSSeller(PATSAPIClient):
     def list_order_events(self, order_id=None):
         """
         As a seller, view the event history (ie all changes) of an order.
+        Now using v2 of the API which returns custom fields eg copy splits.
 
         full (True/False): if True, returns the complete order history including all line items for each version.
 
@@ -627,7 +654,7 @@ class PATSSeller(PATSAPIClient):
         if order_id == None:
             raise PATSException("order ID is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-Organization-Id': self.vendor_id,
             'X-MO-User-ID': self.user_id,
             'X-MO-App': 'pats'
@@ -644,6 +671,7 @@ class PATSSeller(PATSAPIClient):
     def get_order_attachment(self, vendor_id=None, user_id=None, order_id=None, attachment_id=None):
         """
         Get an attachment for an order (including the PDF of the order itself).
+        Now using v2 of the API which returns custom fields eg copy splits (although what does that mean for attachments?!)
 
         https://developer.mediaocean.com/docs/read/seller_orders/Get_order_attachment_seller
         """
@@ -656,7 +684,7 @@ class PATSSeller(PATSAPIClient):
         if attachment_id == None:
             raise PATSException("Attachment ID is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-Organization-Id': vendor_id,
             'X-MO-User-Id': user_id,
             'X-MO-App': 'pats'
@@ -709,6 +737,7 @@ class PATSSeller(PATSAPIClient):
         """
         Send a revision (ie a proposed new version) of an order back to the buyer.
         Must always be in response to a sent order.
+        Now using v2 of the API which allows custom fields eg copy splits.
 
         Paramaters:
         order_id: the order to which this revision is being sent (always the most recent version)
@@ -724,7 +753,7 @@ class PATSSeller(PATSAPIClient):
         if version == None:
             raise PATSException("version is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json'
+            'Accept': 'application/vnd.mediaocean.order-v2+json'
         }
         if user_id:
             extra_headers.update({
@@ -753,6 +782,7 @@ class PATSSeller(PATSAPIClient):
                          email=None, title=None, phone=None, signature=None):
         """
         As a seller, Accept or Reject an order from a buyer.
+        Uses v2 of the API but that doesn't actualy seem to be different for this endpoint.
 
         https://developer.mediaocean.com/docs/seller_orders/Respond_to_order_seller
         https://developer.mediaocean.com/docs/seller_orders/Seller_orders_ref#order_response
@@ -769,7 +799,7 @@ class PATSSeller(PATSAPIClient):
         extra_headers = {
             'X-MO-User-Id': user_id,
             'X-MO-Organization-Id': self.vendor_id,
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-App': 'pats'
         }
         data = {
@@ -804,6 +834,7 @@ class PATSSeller(PATSAPIClient):
     def compare_order_versions(self, user_id=None, order_id=None, majorVersion=None, minorVersion=None):
         """
         Return difference between the specified version and the previous version.
+        Note that this API is still on order-v1.
 
         https://developer.mediaocean.com/docs/read/seller_orders/Compare_order_seller
         """
@@ -824,16 +855,16 @@ class PATSSeller(PATSAPIClient):
             path += "startDate=%s" % start_date.strftime("%Y-%m-%d")
         if end_date:
             path += "&endDate=%s" % end_date.strftime("%Y-%m-%d")
- 
 
     def list_rfps(self, start_date=None, end_date=None, page_size=None, page=None):
         """
         As a seller, view all RFPs from buyers.
+        Uses v2 of the API which includes custom columns such as copySplit.
 
         https://developer.mediaocean.com/docs/read/seller_proposals/Find_RFPs
         """
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
+            'Accept': 'application/vnd.mediaocean.rfp-v2+json',
             'X-MO-Organization-Id': self.vendor_id,
             'X-MO-User-Id': self.user_id,
             'X-MO-App': 'pats'
@@ -871,9 +902,15 @@ class PATSSeller(PATSAPIClient):
 
         return full_json_list
 
+    def find_proposals(self, blah):
+        # https://developer.mediaocean.com/docs/read/seller_proposals/Find_proposals
+        # TODO
+        pass
+
     def list_proposals(self, rfp_id=None):
         """
         As a seller, show all existing proposals in response to a buyer's RFP.
+        Uses v2 of the API which allows custom fields such as copySplit.
 
         https://developer.mediaocean.com/docs/read/seller_proposals/List_proposals
         """
@@ -881,7 +918,7 @@ class PATSSeller(PATSAPIClient):
             raise PATSException("RFP ID is required")
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.proposal-v1+json',
+            'Accept': 'application/vnd.mediaocean.proposal-v2+json',
             'X-MO-Organization-Id': self.vendor_id,
             'X-MO-User-Id': self.user_id,
             'X-MO-App': 'pats'
@@ -898,6 +935,7 @@ class PATSSeller(PATSAPIClient):
     def view_proposal(self, rfp_id=None, proposal_id=None):
         """
         As a seller, show the detail of one proposal in response to a buyer's RFP.
+        Uses v2 of the API which allows custom fields such as copySplit.
 
         https://developer.mediaocean.com/docs/read/seller_proposals/Get_proposal_details
         """
@@ -907,7 +945,7 @@ class PATSSeller(PATSAPIClient):
             raise PATSException("Proposal ID is required")
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.proposal-v1+json',
+            'Accept': 'application/vnd.mediaocean.proposal-v2+json',
             'X-MO-Organization-Id': self.vendor_id,
             'X-MO-User-Id': self.user_id,
             'X-MO-App': 'pats'
@@ -921,10 +959,37 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
+    def view_proposal_events(self, blah):
+        # TODO
+        # https://developer.mediaocean.com/docs/read/seller_proposals/Get_proposal_events
+        pass
+
+    def send_proposal_line_item_message(self, blah):
+        # TODO
+        # https://developer.mediaocean.com/docs/read/seller_proposals/Send_proposal_line_item_message
+        pass
+
+    def get_proposal_line_item_message(self, blah):
+        # TODO
+        # https://developer.mediaocean.com/docs/read/seller_proposals/Get_proposal_lineitem_messages
+        pass
+
+    def send_supplier_delivery_stats(self, blah):
+        # TODO
+        # https://developer.mediaocean.com/docs/read/seller_orders/Send_supplier_delivery_seller
+        pass
+
+    def get_supplier_delivery_status(self, blah):
+        # TODO
+        # https://developer.mediaocean.com/docs/read/seller_orders/Supplier_delivery_status_seller
+        pass
+
     def view_rfp_detail(self, organization_id=None, user_id=None, rfp_id=None):
         """
         Get a single RFP using its public ID.
-        http://developer.mediaocean.com/docs/read/rfp_api/Get_rfp_by_publicid
+        Using v2 of the API which allows for custom fields such as copySplit.
+
+        https://developer.mediaocean.com/docs/read/seller_proposals/Get_RFP_details
         """
         if rfp_id is None:
             raise PATSException("RFP ID is required")
@@ -933,7 +998,7 @@ class PATSSeller(PATSAPIClient):
         if organization_id is None:
             organization_id = self.vendor_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
+            'Accept': 'application/vnd.mediaocean.rfp-v2+json',
             'X-MO-Organization-ID': organization_id,
             'X-MO-User-Id': user_id,
             'X-MO-App': 'pats'
@@ -949,6 +1014,7 @@ class PATSSeller(PATSAPIClient):
     def get_rfp_attachment(self, organization_id=None, user_id=None, rfp_id=None, attachment_id=None):
         """
         Retrieve an attachment to an RFP based on its ID.
+        Uses v2 of the API which allows for custom fields such as copySplit.
 
         https://developer.mediaocean.com/docs/read/seller_proposals/Get_RFP_attachment
         """
@@ -961,7 +1027,7 @@ class PATSSeller(PATSAPIClient):
         if organization_id is None:
             organization_id = self.vendor_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.rfp-v1+json',
+            'Accept': 'application/vnd.mediaocean.rfp-v2+json',
             'X-MO-Organization-ID': organization_id,
             'X-MO-User-Id': user_id,
             'X-MO-App': 'pats'
@@ -975,11 +1041,15 @@ class PATSSeller(PATSAPIClient):
         )
         return js
 
-    def send_proposal(self, user_id=None, rfp_id=None, proposal_id=None, proposal_external_id=None, proposal_comments=None, digital_line_items=None, print_line_items=None, attachments=None):
+    def send_proposal(self, user_id=None, rfp_id=None, proposal_id=None, proposal_external_id=None,
+        currency_code=None, proposal_comments=None,
+        author_name=None, agency_user_email=None, agency_id=None, advertiser_name=None,
+        digital_line_items=None, print_line_items=None, attachments=None
+        ):
         """
         As a seller, send a proposal in response to a buyer's RFP.
 
-        rfp_id: ID of the RFP you are responding to
+        rfp_id: ID of the RFP you are responding to (can be None for a seller-initiated proposal)
         proposal_id (optional): Will treat this action as "re-sending" a new version of an existing proposal
         proposal_external_id: A new, unique ID to assign to the proposal
         proposal_comments: A text message sent to the buyer along with the proposal
@@ -989,6 +1059,7 @@ class PATSSeller(PATSAPIClient):
         attachments (optional): Data for any files to be attached to the proposal
 
         https://developer.mediaocean.com/docs/read/seller_proposals/Send_proposal
+        https://developer.mediaocean.com/docs/read/seller_proposals/Send_seller_initiated_proposal
         https://developer.mediaocean.com/docs/read/seller_proposals/Revise_proposal
         """
 
@@ -1003,11 +1074,21 @@ class PATSSeller(PATSAPIClient):
 
         data = {
             "externalId": proposal_external_id,
+            "vendorId": self.vendor_id,
+            "authorName": author_name,
             "comments" : proposal_comments,
             "digitalLineItems": digital_line_items_obj,
             "printLineItems": print_line_items_obj,
+            "agencyUserEmail": agency_user_email,
+            "agencyId": agency_id,
+            "advertiserName": advertiser_name,
+            "campaignId": None,
             "attachments" : attachments
         }
+        if currency_code:
+            data.update({
+                "currencyCode" : currency_code,
+            })
 
         return self.send_proposal_raw(user_id=user_id, vendor_id=self.vendor_id, rfp_id=rfp_id, proposal_id=proposal_id, data=data)
 
@@ -1026,10 +1107,10 @@ class PATSSeller(PATSAPIClient):
             user_id = self.user_id
         if vendor_id == None:
             raise PATSException("Vendor (aka publisher) ID is required")
-        if rfp_id == None and proposal_id == None:
-            raise PATSException("Either RFP ID (for a new proposal) or Proposal ID (for a proposal revision) is required")
+        #if rfp_id == None and proposal_id == None:
+        #    raise PATSException("Either RFP ID (for a new proposal) or Proposal ID (for a proposal revision) is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.proposal-v1+json',
+            'Accept': 'application/vnd.mediaocean.proposal-v2+json',
             'X-MO-Organization-Id': vendor_id,
             'X-MO-User-Id': user_id,
             'X-MO-App': 'pats'
@@ -1040,6 +1121,9 @@ class PATSSeller(PATSAPIClient):
             path = "/proposals/%s" % proposal_id
         elif rfp_id:
             path = "/rfps/%s/proposals" % rfp_id
+        else:
+            # seller-initiated proposal
+            path = "/proposals"
 
         proposal_uri = self._send_request(
             "PUT" if proposal_id else "POST",
@@ -1060,8 +1144,9 @@ class PATSSeller(PATSAPIClient):
     def view_proposal_detail(self, organization_id=None, user_id=None, proposal_id=None):
         """
         Get a single proposal using its public ID.
+        Uses v2 of the API which allows custom fields such as copySplit.
 
-        http://developer.mediaocean.com/docs/read/rfp_api/Get_rfp_by_publicid
+        https://developer.mediaocean.com/docs/read/seller_proposals/Get_proposal_details
         """
         if proposal_id is None:
             raise PATSException("Proposal ID is required")
@@ -1070,7 +1155,7 @@ class PATSSeller(PATSAPIClient):
         if organization_id is None:
             organization_id = self.vendor_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.proposal-v1+json',
+            'Accept': 'application/vnd.mediaocean.proposal-v2+json',
             'X-MO-Organization-ID': organization_id,
             'X-MO-User-Id': user_id,
             'X-MO-App': 'pats'
@@ -1086,6 +1171,7 @@ class PATSSeller(PATSAPIClient):
     def get_proposal_attachment(self, user_id=None, vendor_id=None, proposal_id=None, attachment_id=None):
         """
         Get contents of proposal attachment based on the proposal ID.
+        Uses v2 of the API which allows custom fields such as copySplit.
 
         https://developer.mediaocean.com/docs/read/seller_proposals/Get_proposal_attachment
         """
@@ -1098,7 +1184,7 @@ class PATSSeller(PATSAPIClient):
         if attachment_id is None:
             raise PATSException("Attachment ID is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.proposal-v1+json',
+            'Accept': 'application/vnd.mediaocean.proposal-v2+json',
             'X-MO-Organization-ID': vendor_id,
             'X-MO-User-Id': user_id,
             'X-MO-App': 'pats'
