@@ -39,7 +39,7 @@ import string
 import time
 from urllib import urlencode
 
-VERSION = '0.11' # update for 2016.3 APIs
+VERSION = '0.12' # update for 2016.6 APIs
 
 RETRY_LIMIT = 3 # number of times to re-try HTTP requests if we get a gateway timeout error
 
@@ -245,6 +245,7 @@ class CampaignDetails(JSONSerializable):
     media_mix = []  # eg { "Media": [ { "MediaMix": "Online" }, { "MediaMix": "Print" } ] }
     campaign_budget = 0         # eg 1000000
     multi_currency = False      # flag that campaign can take non-GBP currencies
+    currency_code = False       # choose a specific currency rather than using the default
 
     def __init__(self, *args, **kwargs):
         self.organisation_id = kwargs.get('organisation_id', '')
@@ -264,6 +265,7 @@ class CampaignDetails(JSONSerializable):
         self.digital_campaign_budget = kwargs.get('digital_campaign_budget', [])
         self.campaign_budget = kwargs.get('campaign_budget', '')
         self.multi_currency = kwargs.get('multi_currency', False)
+        self.currency_code = kwargs.get('currency_code', False)
         self.external_id = kwargs.get('external_id', '')
 
     def dict_repr(self):
@@ -278,6 +280,8 @@ class CampaignDetails(JSONSerializable):
             },
             "multiCurrency": self.multi_currency
         }
+        if self.currency_code:
+            dict.update({ "currencyCode": self.currency_code })
         #if self.campaign_budget and (self.print_campaign_budget or self.digital_campaign_budget):
         #    raise PATSException("Campaign can't have both individual budgets and a campaign budget")
         # we want to end up with either
@@ -327,6 +331,8 @@ class LineItem(JSONSerializable):
     rate = 0.0 # dd.dddd,
     cost = 0.0 # dddd.dddd, (= units * rate based on costmethod, eg CPM is / 1000)
     freeFormMediaProperty = "" # was site/publication
+    mediaProperty = "" # from product catalogue
+    copySplit = "" # 
 
     def getvar(self, varname, default, args, kwargs):
         """
@@ -358,6 +364,8 @@ class LineItem(JSONSerializable):
         self.campaignId = self.getvar('campaignId', None, args, kwargs)
         self.supplierPlacementParentReference = self.getvar('supplierPlacementParentReference', None, args, kwargs)
         self.freeFormMediaProperty = self.getvar('freeFormMediaProperty', None, args, kwargs)
+        self.mediaProperty = self.getvar('mediaProperty', None, args, kwargs)
+        self.copySplit = self.getvar('copySplit', None, args, kwargs)
 
     def getPackageType(self):
         return None
@@ -408,6 +416,10 @@ class LineItem(JSONSerializable):
             dict.update({
                 "section": self.section,
                 "subsection": self.subsection
+            })
+        if self.copySplit:
+            dict.update({
+                "copySplit": self.copySplit,
             })
         return dict
 
@@ -626,40 +638,53 @@ class Product(JSONSerializable):
     New style of product added in 2016.3
     """
     id = None               # PATS-generated ID for the product
-    productId = None        # Third-party ID for the product
     status = None           # ACTIVE or INACTIVE
-    name = None             # Name of the product (line item)
+    productId = None        # Third-party ID for the product
     mediaType = None        # "PRINT" or "DIGITAL"
+    agencyEnabled = None    # Flag for whether agency staff can see this product
+    name = None             # Name of the product (line item)
     mediaPropertyId = None  # ID of Media Property (as defined in Admin area of the publication) (optional)
+    clientId = None         # for future use, currently always null / None
+    buyType = None          # buyType of the product (optional)
+    buyCategory = None      # buyCategory of the product (optional, only valid if buyType is provided)
+    size = None             # Only valid for Print products, optional
+    position = None         # valid for print and digital products. Optional
+    costMethod = None       # costMethod of the product. Optional.
+    unitType = None         # UnitType of the product. Only valid if costMethod is provided. Optional.
+    rate = None
+    units = None
+    cost = None
+    dimensions = None       # only valid for Digital products.
+    region = None           # only valid for Print products.
     currencyCode = None     # Default currency code of order - optional, defaults to GBP (??)
-    agencyEnabled = None    # Whether agencies can see it - 0 or 1 bizarrely?!
     section = None          # section (optional)
     subsection = None       # subsection (optional)
-    position = None         # position (optional)
     positionGuaranteed = None # is the position guaranteed (optional - basically it's never "Yes" for our publishers)
+    comments = None         # pre-populated comments for the product
 
     def __init__(self, *args, **kwargs):
         self.id = kwargs.get('id', None)
-        self.productId = kwargs.get('productId', None)
         self.status = kwargs.get('status', None)
-        self.name = kwargs.get('name', None)
+        self.productId = kwargs.get('productId', None)
         self.mediaType = kwargs.get('mediaType', None)
+        self.agencyEnabled = kwargs.get('agencyEnabled', None)
+        self.name = kwargs.get('name', None)
         self.mediaPropertyId = kwargs.get('mediaPropertyId', None)
         self.clientId = kwargs.get('clientId', None)
-        self.currencyCode = kwargs.get('currencyCode', None)
-        self.agencyEnabled = kwargs.get('agencyEnabled', None)
-        self.section = kwargs.get('section', None)
-        self.subsection = kwargs.get('subsection', None)
-        self.size = kwargs.get('size', None)
-        self.position = kwargs.get('position', None)
-        self.dimensions = kwargs.get('dimensions', None)
-        self.cost = kwargs.get('cost', None)
-        self.rate = kwargs.get('rate', None)
-        self.units = kwargs.get('units', None)
-        self.costMethod = kwargs.get('costMethod', None)
-        self.unitType = kwargs.get('unitType', None)
         self.buyType = kwargs.get('buyType', None)
         self.buyCategory = kwargs.get('buyCategory', None)
+        self.size = kwargs.get('size', None)
+        self.position = kwargs.get('position', None)
+        self.costMethod = kwargs.get('costMethod', None)
+        self.unitType = kwargs.get('unitType', None)
+        self.rate = kwargs.get('rate', None)
+        self.units = kwargs.get('units', None)
+        self.cost = kwargs.get('cost', None)
+        self.dimensions = kwargs.get('dimensions', None)
+        self.region = kwargs.get('region', None)
+        self.currencyCode = kwargs.get('currencyCode', None)
+        self.section = kwargs.get('section', None)
+        self.subsection = kwargs.get('subsection', None)
         self.positionGuaranteed = kwargs.get('positionGuaranteed', None)
         self.comments = kwargs.get('comments', None)
 
@@ -670,45 +695,41 @@ class Product(JSONSerializable):
             dict.update({
                 "id": self.id
             })
-        if self.productId:
-            dict.update({
-                "productId": self.productId
-            })
         if self.status:
             dict.update({
                 "status": self.status
             })
-        if self.name:
+        if self.productId:
             dict.update({
-                "name": self.name
+                "productId": self.productId
             })
         if self.mediaType:
             dict.update({
                 "mediaType": self.mediaType
             })
-        if self.mediaPropertyId:
-            dict.update({
-                "mediaPropertyId": self.mediaPropertyId
-            })
-        if self.currencyCode:
-            dict.update({
-                "currencyCode": self.currencyCode
-            })
         if self.agencyEnabled:
             dict.update({
                 "agencyEnabled": self.agencyEnabled
+            })
+        if self.name:
+            dict.update({
+                "name": self.name
+            })
+        if self.mediaPropertyId:
+            dict.update({
+                "mediaPropertyId": self.mediaPropertyId
             })
         if self.clientId:
             dict.update({
                 "clientId": self.clientId
             })
-        if self.section:
+        if self.buyType:
             attributes.update({
-                "section": self.section
+                "buyType": self.buyType
             })
-        if self.subsection:
+        if self.buyCategory:
             attributes.update({
-                "subsection": self.subsection
+                "buyCategory": self.buyCategory
             })
         if self.size:
             attributes.update({
@@ -718,13 +739,13 @@ class Product(JSONSerializable):
             attributes.update({
                 "position": self.position
             })
-        if self.dimensions:
+        if self.costMethod:
             attributes.update({
-                "dimensions": self.dimensions
+                "costMethod": self.costMethod
             })
-        if self.cost:
+        if self.unitType:
             attributes.update({
-                "cost": self.cost
+                "unitType": self.unitType
             })
         if self.rate:
             attributes.update({
@@ -734,21 +755,29 @@ class Product(JSONSerializable):
             attributes.update({
                 "units": self.units
             })
-        if self.costMethod:
+        if self.cost:
             attributes.update({
-                "costMethod": self.costMethod
+                "cost": self.cost
             })
-        if self.unitType:
+        if self.dimensions:
             attributes.update({
-                "unitType": self.unitType
+                "dimensions": self.dimensions
             })
-        if self.buyType:
+        if self.region:
             attributes.update({
-                "buyType": self.buyType
+                "region": self.region
             })
-        if self.buyCategory:
+        if self.currencyCode:
+            dict.update({
+                "currencyCode": self.currencyCode
+            })
+        if self.section:
             attributes.update({
-                "buyCategory": self.buyCategory
+                "section": self.section
+            })
+        if self.subsection:
+            attributes.update({
+                "subsection": self.subsection
             })
         if self.positionGuaranteed:
             attributes.update({
