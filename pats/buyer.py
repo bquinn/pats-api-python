@@ -121,7 +121,6 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-
     def get_users_for_seller(self, agency_id=None, user_id=None, vendor_id=None):
         """
         As a buyer, view all the sellers to whom I can send orders at the
@@ -183,7 +182,7 @@ class PATSBuyer(PATSAPIClient):
             extra_headers,
             campaign_details.json_repr()
         )
-        # campaign_uri looks like https://prisma-devciny.api.mediaocean.com/campaigns/CP1D9G
+        # campaign_uri looks like https://prisma.api.mediaocean.com/campaigns/CP1D9G
         match = re.search('https://(.+)?/campaigns/(.+?)$', campaign_uri)
         if match:
             campaign_id = match.group(2) 
@@ -209,15 +208,18 @@ class PATSBuyer(PATSAPIClient):
             'X-MO-Agency-Group-Id': self.agency_group_id,
             'X-MO-Organization-ID': organisation_id
         }
-        response = self._send_request(
+        campaign_uri = self._send_request(
             "PUT",
             AGENCY_API_DOMAIN,
             "/campaigns/%s" % campaign_id,
             extra_headers,
             campaign_details.json_repr()
         )
-        # used to return a js object, now it's just the URI of the object
-        return response
+        # campaign_uri looks like https://prisma-devciny.api.mediaocean.com/campaigns/CP1D9G
+        match = re.search('https://(.+)?/campaigns/(.+?)$', campaign_uri)
+        if match:
+            campaign_id = match.group(2)
+        return campaign_id
 
     def view_campaign_detail(self, agency_group_id=None, agency_id=None, user_id=None, campaign_id=None):
         """
@@ -506,28 +508,37 @@ class PATSBuyer(PATSAPIClient):
         """
         As a buyer, view all proposals I have sent and their status.
 
-        https://developer.mediaocean.com/docs/read/buyer_proposals/List_proposals
+        https://developer.mediaocean.com/docs/buyer_proposals/List_proposals
+        https://developer.mediaocean.com/docs/buyer_proposals/Find_proposals
         """
-        if rfp_id is None:
-            raise PATSException("RFP ID is required")
+        # Now that we can have seller-initiatied proposals, rfp_id is no longer required
+        #if rfp_id is None:
+        #    raise PATSException("RFP ID is required")
         if agency_group_id is None:
             agency_group_id = self.agency_group_id
         if agency_id is None:
             agency_id = self.agency_id
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.proposal-v1+json',
+            'Accept': 'application/vnd.mediaocean.proposal-v2+json',
             'X-MO-Organization-ID': agency_id,
             'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-User-Id': self.user_id,
             'X-MO-App': 'prisma'
         }
 
-        path = '/rfps/%s/proposals?' % rfp_id
-        if start_date:
-            path += "startDate=%s" % start_date.strftime("%Y-%m-%d")
-        if end_date:
-            path += "&endDate=%s" % end_date.strftime("%Y-%m-%d")
+        if rfp_id:
+            path = '/rfps/%s/proposals?' % rfp_id
+            if start_date:
+                path += "startDate=%s" % start_date.strftime("%Y-%m-%d")
+            if end_date:
+                path += "&endDate=%s" % end_date.strftime("%Y-%m-%d")
+        else:
+            # seller-initiated proposal:
+            path = '/proposals?'
+            if start_date:
+                path += "since=%s" % start_date.strftime("%Y-%m-%d")
+
         if page:
             path += "&page=%s" % page
         js = self._send_request(
@@ -711,7 +722,7 @@ class PATSBuyer(PATSAPIClient):
         # {"total":117,"products":[{"vendorPublicId":"35-EEBMG4J-4","productPublicId":"PC-11TU", ... }
         return js
 
-    def get_media_property_details(self, user_id=None, agency_group_id=None, agency_id=None):
+    def get_media_property_details(self, user_id=None, agency_group_id=None, agency_id=None, organisation_id=None):
         """
         List a vendor's media property fields and field restrictions.
 
@@ -730,7 +741,6 @@ class PATSBuyer(PATSAPIClient):
             'X-MO-Organization-ID': self.agency_id,
             'X-MO-App': 'prisma'
         }
-        # a publisher can query another publisher's properties if they want...
         path = '/vendors/%s/mediaproperties/fields' % organisation_id
         js = self._send_request(
             "GET",
@@ -753,7 +763,7 @@ class PATSBuyer(PATSAPIClient):
         print_line_items: object inserted as "line_items" in the order
         order_id (optional): for "re-send" orders, which order_id is being updated
 
-        http://developer.mediaocean.com/docs/buyer_orders/Send_order_buyer
+        https://developer.mediaocean.com/docs/buyer_orders/Send_order_buyer
         http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#order_version
         http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#digital
         http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#print
@@ -812,12 +822,12 @@ class PATSBuyer(PATSAPIClient):
         order_id (optional): if supplied, this order is treated as a re-send of an existing order
         data: full JSON payload - must contain campaign ID, insertion order details and all line items
 
-        http://developer.mediaocean.com/docs/buyer_orders/Send_order_buyer
+        https://developer.mediaocean.com/docs/buyer_orders/Send_order_buyer
+        https://developer.mediaocean.com/docs/buyer_orders/Resend_order_buyer
+
         http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#order_version
         http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#digital
         http://developer.mediaocean.com/docs/buyer_orders/Buyer_orders_ref#print
-
-        http://developer.mediaocean.com/docs/buyer_orders/Resend_order_buyer
         """
         if agency_id==None:
             agency_id=self.agency_id
@@ -826,7 +836,7 @@ class PATSBuyer(PATSAPIClient):
         if campaign_id==None:
             raise PATSException("Campaign ID is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': agency_id,
             'X-MO-App': 'prisma'
@@ -859,7 +869,7 @@ class PATSBuyer(PATSAPIClient):
         """
         Retrieve a list of all orders booked since "since_date" (new in 2015.8)
 
-        http://developer.mediaocean.com/docs/buyer_orders/Find_orders_buyer
+        https://developer.mediaocean.com/docs/buyer_orders/Find_orders_buyer
         """
         if since_date == None:
             raise PATSException("Since date is required")
@@ -873,7 +883,7 @@ class PATSBuyer(PATSAPIClient):
             user_id = self.user_id
         path = '/orders?since=%s&size=%s&page=%s' % (since_date.strftime("%Y-%m-%d"), page_size, page)
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-App': 'prisma',
             'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': agency_id
@@ -912,8 +922,8 @@ class PATSBuyer(PATSAPIClient):
         """
         As a buyer, list all revisions on a given order version.
         (Note than in 2015.7 and previous, this would list *all* order revisions)
-        
-        http://developer.mediaocean.com/docs/buyer_orders/List_order_revs_buyer
+
+        https://developer.mediaocean.com/docs/buyer_orders/List_order_revs_buyer 
         """
         if agency_group_id == None:
             agency_group_id = self.agency_group_id
@@ -923,7 +933,7 @@ class PATSBuyer(PATSAPIClient):
             user_id = self.user_id
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-App': 'prisma',
             'X-MO-Organization-Id': agency_id,
             'X-MO-Agency-Group-Id': agency_group_id,
@@ -943,7 +953,7 @@ class PATSBuyer(PATSAPIClient):
         """
         As a buyer, list versions of an order.
 
-        http://developer.mediaocean.com/docs/buyer_orders/List_order_versions_buyer
+        https://developer.mediaocean.com/docs/buyer_orders/List_order_versions_buyer
         """
         if user_id == None:
             user_id = self.user_id
@@ -957,7 +967,7 @@ class PATSBuyer(PATSAPIClient):
             agency_id = self.agency_id
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-App': 'prisma',
             'X-MO-Organization-Id': agency_id,
             'X-MO-Agency-Group-Id': agency_group_id,
@@ -976,7 +986,7 @@ class PATSBuyer(PATSAPIClient):
         """
         As a buyer, view the detail of one order version.
 
-        http://developer.mediaocean.com/docs/buyer_orders/Get_order_version_details_buyer
+        https://developer.mediaocean.com/docs/buyer_orders/Get_order_version_details_buyer
         """
         if user_id == None:
             user_id = self.user_id
@@ -992,7 +1002,7 @@ class PATSBuyer(PATSAPIClient):
             agency_id = self.agency_id
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-App': 'prisma',
             'X-MO-Organization-Id': agency_id,
             'X-MO-Agency-Group-Id': agency_group_id,
@@ -1010,7 +1020,7 @@ class PATSBuyer(PATSAPIClient):
         """
         As a buyer, view the detail of one order revision.
 
-        http://developer.mediaocean.com/docs/buyer_orders/Get_order_rev_details_buyer
+        https://developer.mediaocean.com/docs/buyer_orders/Get_order_rev_details_buyer
         """
         if user_id == None:
             user_id = self.user_id
@@ -1028,7 +1038,7 @@ class PATSBuyer(PATSAPIClient):
             agency_id = self.agency_id
 
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-App': 'prisma',
             'X-MO-Organization-Id': agency_id,
             'X-MO-Agency-Group-Id': agency_group_id,
@@ -1046,7 +1056,7 @@ class PATSBuyer(PATSAPIClient):
         """
         Get an attachment for an order (including the PDF of the order itself).
 
-        http://developer.mediaocean.com/docs/buyer_orders/Get_order_attachment_buyer
+        https://developer.mediaocean.com/docs/buyer_orders/Get_order_attachment_buyer
         """
         if agency_group_id == None:
             agency_group_id = self.agency_group_id
@@ -1059,7 +1069,7 @@ class PATSBuyer(PATSAPIClient):
         if order_id == None:
             raise PATSException("Order ID is required")
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-Agency-Group-Id': agency_group_id,
             'X-MO-Organization-Id': agency_id,
             'X-MO-User-Id': user_id,
@@ -1077,7 +1087,7 @@ class PATSBuyer(PATSAPIClient):
         """
         "Return order revision" which means "Send a message back to the person who sent this revision"
 
-        http://developer.mediaocean.com/docs/buyer_orders/Return_order_rev_buyer
+        https://developer.mediaocean.com/docs/buyer_orders/Return_order_rev_buyer
         """
         if agency_id == None:
             agency_id = self.agency_id
@@ -1091,7 +1101,7 @@ class PATSBuyer(PATSAPIClient):
             raise PATSException("Order ID is required")
         # TODO: allow attachments
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-App': 'prisma',
             'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': agency_id,
@@ -1117,7 +1127,7 @@ class PATSBuyer(PATSAPIClient):
         """
         "Request order revision" which means "Send a message to the person who received this order"
 
-        http://developer.mediaocean.com/docs/buyer_orders/Request_rev_buyer
+        https://developer.mediaocean.com/docs/buyer_orders/Request_rev_buyer
         """
         # TODO: allow attachments
 
@@ -1134,7 +1144,7 @@ class PATSBuyer(PATSAPIClient):
         if user_id == None:
             user_id = self.user_id
         extra_headers = {
-            'Accept': 'application/vnd.mediaocean.order-v1+json',
+            'Accept': 'application/vnd.mediaocean.order-v2+json',
             'X-MO-App': 'prisma',
             'X-MO-Agency-Group-ID': agency_group_id,
             'X-MO-Organization-ID': agency_id,
