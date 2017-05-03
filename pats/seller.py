@@ -29,12 +29,10 @@ Based on Mediaocean PATS API documented at https://developer.mediaocean.com/
 """
 
 from collections import OrderedDict
-from httplib import HTTPSConnection
 import json
 import os
 import re
 import string
-from urllib import urlencode
 from .core import PATSAPIClient, PATSException, JSONSerializable, Product
 
 PUBLISHER_API_DOMAIN = 'demo-publishers.api.mediaocean.com'

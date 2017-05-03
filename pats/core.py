@@ -29,7 +29,7 @@ Based on Mediaocean PATS API documented at https://developer.mediaocean.com/
 """
 
 from collections import OrderedDict
-from httplib import HTTPSConnection
+import http.client
 import datetime
 import json
 import os
@@ -37,7 +37,6 @@ import re
 from socket import gaierror
 import string
 import time
-from urllib import urlencode
 
 VERSION = '0.12' # update for 2016.6 APIs
 
@@ -94,7 +93,7 @@ class PATSAPIClient(object):
 
     def _send_request(self, method, domain, path, extra_headers, body=None):
         # Create the http object
-        h = HTTPSConnection(domain)
+        h = http.client.HTTPSConnection(domain)
 
         if self.debug_mode:
             h.set_debuglevel(10)
@@ -144,8 +143,8 @@ class PATSAPIClient(object):
             self.session['response_text'] = response_text
 
         if self.debug_mode:
-            print "DEBUG: response status is %d, full response is" % response_status
-            print response_text
+            print ("DEBUG: response status is %d, full response is" % response_status)
+            print (response_text)
 
         # Bad Request gives an error in text, not JSON
         if response_status == 400:
@@ -331,8 +330,9 @@ class LineItem(JSONSerializable):
     rate = 0.0 # dd.dddd,
     cost = 0.0 # dddd.dddd, (= units * rate based on costmethod, eg CPM is / 1000)
     freeFormMediaProperty = "" # was site/publication
-    mediaProperty = "" # from product catalogue
-    copySplit = "" # 
+    mediaProperty = ""  # from product catalogue
+    copySplit = ""  # 
+    region = ""  # it's now available in both digital and print
 
     def getvar(self, varname, default, args, kwargs):
         """
@@ -366,6 +366,7 @@ class LineItem(JSONSerializable):
         self.freeFormMediaProperty = self.getvar('freeFormMediaProperty', None, args, kwargs)
         self.mediaProperty = self.getvar('mediaProperty', None, args, kwargs)
         self.copySplit = self.getvar('copySplit', None, args, kwargs)
+        self.region = self.getvar('region', None, args, kwargs)
 
     def getPackageType(self):
         return None
@@ -421,6 +422,10 @@ class LineItem(JSONSerializable):
             dict.update({
                 "copySplit": self.copySplit,
             })
+        if self.region:
+            dict.update({
+                "region": self.region,
+            })
         return dict
 
 class LineItemPrint(LineItem):
@@ -429,7 +434,6 @@ class LineItemPrint(LineItem):
     coverDate = None
     saleDate = None
     position = None # could merge into generic?
-    region = None
     # size : {
     size_type = None # "type of print size" - eg "cms"
     size_units =None # - no of units, eg for 25 x 4 would be 100
@@ -460,7 +464,6 @@ class LineItemPrint(LineItem):
         self.coverDate = self.getvar('coverDate', '', args, kwargs)
         self.saleDate = self.getvar('saleDate', '', args, kwargs)
         self.position = self.getvar('position', '', args, kwargs)
-        self.region = self.getvar('region', '', args, kwargs)
         self.positionGuaranteed = self.getvar('positionGuaranteed', False, args, kwargs)
         self.includeInDigitalEdition = self.getvar('includeInDigitalEdition', False, args, kwargs)
         self.serialNumber = self.getvar('serialNumber', None, args, kwargs)
@@ -487,8 +490,7 @@ class LineItemPrint(LineItem):
                 'saleDate': self.saleDate.strftime("%Y-%m-%d"),
                 'positionGuaranteed': self.positionGuaranteed,
                 'includeInDigitalEdition': self.includeInDigitalEdition,
-                'position': self.position,
-                'region': self.region
+                'position': self.position
             })
             if self.size_units:
                 dict['size'].update({
@@ -655,7 +657,7 @@ class Product(JSONSerializable):
     units = None
     cost = None
     dimensions = None       # only valid for Digital products.
-    region = None           # only valid for Print products.
+    region = None           # now valid for both Print and Digital products.
     currencyCode = None     # Default currency code of order - optional, defaults to GBP (??)
     section = None          # section (optional)
     subsection = None       # subsection (optional)

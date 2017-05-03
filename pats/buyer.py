@@ -29,7 +29,6 @@ Based on Mediaocean PATS API documented at https://developer.mediaocean.com/
 """
 
 from collections import OrderedDict
-from httplib import HTTPSConnection
 import base64
 import datetime
 import json
@@ -37,7 +36,7 @@ import os
 import re
 import string
 import types
-from urllib import urlencode
+import urllib.parse
 from .core import PATSAPIClient, PATSException, CampaignDetails
 
 AGENCY_API_DOMAIN = 'prisma-demo.api.mediaocean.com'
@@ -549,6 +548,25 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
+    def list_all_proposals(self, agency_group_id=None, agency_id=None, rfp_id=None, start_date=None, end_date=None):
+        """
+        Loop over the list_proposals method until we definitely have all orders in an array
+        """
+        page_size = 25
+        page = 1
+        full_json_list = []
+        remaining_content = True
+        while (remaining_content):
+            partial_json_list = self.list_proposals(
+                agency_group_id=agency_group_id, agency_id=agency_id, rfp_id=rfp_id,
+                start_date=start_date, end_date=end_date, page=page
+                )
+            full_json_list.extend(partial_json_list)
+            page = page + 1
+            remaining_content = (len(partial_json_list) == page_size)
+
+        return full_json_list
+ 
     def view_proposal_detail(self, agency_group_id=None, agency_id=None, user_id=None, proposal_id=None):
         """
         Get a single proposal using its public ID.
@@ -608,9 +626,12 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def return_proposal(self, agency_group_id=None, agency_id=None, user_id=None, proposal_id=None, comments=None, due_date=None, emails=None, attachments=None):
+    def return_proposal(self, agency_group_id=None, agency_id=None, user_id=None,
+                        proposal_id=None, comments=None, due_date=None, emails=None,
+                        attachments=None):
         """
-        "Return a proposal", which means "send a comment back to the seller that sent me this proposal"
+        "Return a proposal", which means "send a comment back to the
+        seller that sent me this proposal"
 
         https://developer.mediaocean.com/docs/read/buyer_proposals/Return_proposal
         """
@@ -644,6 +665,51 @@ class PATSBuyer(PATSAPIClient):
             "/proposals/%s/return" % proposal_id,
             extra_headers,
             json.dumps(data)
+        )
+        return js
+
+    def link_proposal_to_campaign(self, agency_group_id=None, agency_id=None,
+                                  user_id=None, proposal_id=None, campaign_id=None):
+        """
+        New in 2017.1 - link a (seller-initiated) proposal to a campaign
+
+        https://developer.mediaocean.com/docs/read/buyer_proposals/Link_sip_to_campaign
+
+        The workflow is:
+        - Seller creates and sends a new proposal
+        - Buyer and seller might go back and forth a few times
+        - Buyer creates a campaign
+        - Buyer links proposal to campaign
+        - Buyer sends order on the campaign
+        - Seller accepts order.
+        """
+
+        if campaign_id is None:
+            raise PATSException("Campaign ID is required")
+        if agency_group_id is None:
+            agency_group_id = self.agency_group_id
+        if agency_id is None:
+            agency_id = self.agency_id
+        if user_id is None:
+            user_id = self.user_id
+
+        extra_headers = {
+            'Accept': 'application/vnd.mediaocean.proposal-v2+json',
+            'X-MO-User-Id': user_id,
+            'X-MO-Agency-Group-ID': agency_group_id,
+            'X-MO-Organization-ID': agency_id,
+            'X-MO-App': 'prisma'
+        }
+ 
+        path = '/proposals/%s' % proposal_id
+        path += '?operation=link&campaignId=%s' % campaign_id
+
+        js = self._send_request(
+            "GET",  # docs say this is PUT - bug PATS-xxxx
+            AGENCY_API_DOMAIN,
+            path,
+            extra_headers,
+            None # no payload -- no json.dumps(data)
         )
         return js
 
@@ -710,7 +776,7 @@ class PATSBuyer(PATSAPIClient):
             params.update({'max_results' : max_results})
         if include_logo:
             params.update({'include_logo' : include_logo})
-        params = urlencode(params)
+        params = urllib.parse.urlencode(params)
 
         js = self._send_request(
             "GET",
