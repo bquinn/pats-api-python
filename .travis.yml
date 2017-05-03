@@ -1,0 +1,16 @@
+language: python
+# python versions to test on (all tested separately)
+python:
+ - "2.6"
+ - "2.7"
+ - "3.2"
+ - "3.3"
+ - "3.4"
+ - "3.5"
+ - "3.6"
+ - "3.7dev"
+# install dependencies
+install:
+ - pip install .
+ - pip install -r requirements.txt
+script: python 
