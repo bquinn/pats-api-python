@@ -32,7 +32,7 @@ from collections import OrderedDict
 try:
     from http.client import HTTPSConnection
 except ImportError:
-    from httplib import HTTPSConnection
+    from httplib import HTTPSConnection # 2.x
 import datetime
 import json
 import os
@@ -96,7 +96,7 @@ class PATSAPIClient(object):
 
     def _send_request(self, method, domain, path, extra_headers, body=None):
         # Create the http object
-        h = http.client.HTTPSConnection(domain)
+        h = HTTPSConnection(domain)
 
         if self.debug_mode:
             h.set_debuglevel(10)

@@ -36,7 +36,10 @@ import os
 import re
 import string
 import types
-import urllib.parse
+try:
+    from urllib.parse import urlencode
+except ImportError:
+    from urllib import urlencode # 2.x
 from .core import PATSAPIClient, PATSException, CampaignDetails
 
 AGENCY_API_DOMAIN = 'prisma-demo.api.mediaocean.com'
@@ -776,7 +779,7 @@ class PATSBuyer(PATSAPIClient):
             params.update({'max_results' : max_results})
         if include_logo:
             params.update({'include_logo' : include_logo})
-        params = urllib.parse.urlencode(params)
+        params = urlencode(params)
 
         js = self._send_request(
             "GET",
