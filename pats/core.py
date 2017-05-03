@@ -29,7 +29,10 @@ Based on Mediaocean PATS API documented at https://developer.mediaocean.com/
 """
 
 from collections import OrderedDict
-import http.client
+try:
+    from http.client import HTTPSConnection
+except ImportError:
+    from httplib import HTTPSConnection
 import datetime
 import json
 import os
