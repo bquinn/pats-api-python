@@ -37,6 +37,7 @@ import datetime
 import json
 import os
 import re
+import six # for 2.x / 3.x compatibility eg iteritems
 from socket import gaierror
 import string
 import time
@@ -110,7 +111,7 @@ class PATSAPIClient(object):
         curl = ''
         if self.raw_mode and self.session:
             curl = 'curl -v -X "%s" ' % method
-            for header_name, header_value in headers.iteritems():
+            for header_name, header_value in six.iteritems(headers):
                 curl += '-H "%s: %s" ' % (header_name, header_value)
             if body:
                 # we want to turn ' into '"'"' for curl output so we need to do this!
