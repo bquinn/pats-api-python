@@ -175,8 +175,12 @@ class PATSBuyer(PATSAPIClient):
             'X-MO-App': 'prisma',
             'X-MO-Agency-Group-ID': self.agency_group_id,
             'X-MO-Organization-ID': organisation_id,
-            'X-MO-User-ID': user_id
         }
+        # allow for no user ID for unit testing purposes - really we should always have one
+        if user_id:
+            extra_headers.update({
+                'X-MO-User-ID': user_id
+            })
         campaign_uri = self._send_request(
             "POST",
             AGENCY_API_DOMAIN,

@@ -163,7 +163,7 @@ class PATSAPIClient(object):
         # 422 is "unprocessable entity" but more details are given in the JS response
         # so we should use that instead
         if response_status != 200 and response_status != 422:
-            self._relay_error(response_status, response.reason + " " + response_text)
+            self._relay_error(response_status, response.reason + " " + str(response_text))
 
         js = None
         if not response_text or response_text == '':
