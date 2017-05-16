@@ -166,13 +166,13 @@ class PATSAPIClient(object):
             self._relay_error(response_status, response.reason + " " + response_text)
 
         js = None
-        if response_text == '':
-            return ''
+        if not response_text or response_text == '':
+            return response_text
 
         if response_status == 422:
             self._relay_error(response_status, response_text)
 
-        js = json.JSONDecoder().decode(response_text)
+        js = json.JSONDecoder().decode(response_text.decode('utf-8'))
 
         if response_status == 422:
             if 'message' in js:
