@@ -89,7 +89,8 @@ class PATSAPIClient(object):
         headers = {
             'User-Agent': "PATS Python Library/%s" % VERSION,
             'Content-Type': content_type,
-            'X-MO-API-Key': self.api_key
+            'X-MO-API-Key': self.api_key,
+            'Connection': 'close'
         }
         headers.update(extra_headers)
         return headers
@@ -291,7 +292,7 @@ class CampaignDetails(JSONSerializable):
         # or
         # "MediaBudget": { "Medias": { "Media": [ { "MediaMix": "Online", "Budget": 50000.00 } ] } }
         media_budget = {}
-        if self.campaign_budget and self.campaign_budget > 0:
+        if self.campaign_budget and int(self.campaign_budget) > 0:
             media_budget.update({
                 "campaignBudget": self.campaign_budget,
             })
