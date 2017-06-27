@@ -289,7 +289,7 @@ class PATSBuyer(PATSAPIClient):
         # user can supply "budget_amount" with one budget or "budgets" with a list
         if budget_amount:
             data.update({ 'budgets': [ budget_amount ] })
-        elif (budgets and type(budgets) is types.ListType):
+        elif (budgets and type(budgets) is list):
             data.update({'budgets': budgets})
         else:
             raise PATSException("Either budget_amount (single value) or budgets (list) is required")
