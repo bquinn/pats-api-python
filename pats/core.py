@@ -136,7 +136,7 @@ class PATSAPIClient(object):
                 continue
             response = h.getresponse()
             response_status = response.status
-            response_text = response.read()
+            response_text = response.read().decode('utf-8')
             if response_status == 504:
                 # gateway timeout error: sleep then retry (up to retry limit)
                 time.sleep(5)
@@ -173,7 +173,7 @@ class PATSAPIClient(object):
         if response_status == 422:
             self._relay_error(response_status, response_text)
 
-        js = json.JSONDecoder().decode(response_text.decode('utf-8'))
+        js = json.JSONDecoder().decode(response_text)
 
         if response_status == 422:
             if 'message' in js:
