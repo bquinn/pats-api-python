@@ -712,7 +712,7 @@ class PATSBuyer(PATSAPIClient):
         path += '?operation=link&campaignId=%s' % campaign_id
 
         js = self._send_request(
-            "GET",  # docs say this is PUT - bug PATS-xxxx
+            "PUT",
             AGENCY_API_DOMAIN,
             path,
             extra_headers,
