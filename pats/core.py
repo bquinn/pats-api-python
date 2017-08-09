@@ -648,6 +648,7 @@ class Product(JSONSerializable):
     status = None           # ACTIVE or INACTIVE
     productId = None        # Third-party ID for the product
     mediaType = None        # "PRINT" or "DIGITAL"
+    barterDetail = None     # Free-format text used to show whether the order is associated to a barter agency
     agencyEnabled = None    # Flag for whether agency staff can see this product
     name = None             # Name of the product (line item)
     mediaPropertyId = None  # ID of Media Property (as defined in Admin area of the publication) (optional)
@@ -674,6 +675,7 @@ class Product(JSONSerializable):
         self.status = kwargs.get('status', None)
         self.productId = kwargs.get('productId', None)
         self.mediaType = kwargs.get('mediaType', None)
+        self.barterDetail = kwargs.get('barterDetail', None)
         self.agencyEnabled = kwargs.get('agencyEnabled', None)
         self.name = kwargs.get('name', None)
         self.mediaPropertyId = kwargs.get('mediaPropertyId', None)
@@ -713,6 +715,10 @@ class Product(JSONSerializable):
         if self.mediaType:
             dict.update({
                 "mediaType": self.mediaType
+            })
+        if self.barterDetail:
+            dict.update({
+                "barterDetail": self.barterDetail
             })
         if self.agencyEnabled:
             dict.update({
