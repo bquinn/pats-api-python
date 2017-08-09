@@ -2,7 +2,7 @@ from distutils.core import setup
 setup(
   name = 'pats',
   packages = ['pats'], # this must be the same as the name above
-  version = '0.1',
+  version = '0.2',
   description = 'Client for the PATS API (www.pats.org.uk)',
   author = 'Brendan Quinn',
   author_email = 'brendan@cluefulmedia.com',
