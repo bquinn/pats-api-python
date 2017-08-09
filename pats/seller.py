@@ -695,11 +695,13 @@ class PATSSeller(PATSAPIClient):
         )
         return js
         
-    def send_order_revision(self, order_id=None, version=None, user_id=None, comment=None, print_line_items=None, digital_line_items=None):
+    def send_order_revision(self, order_id=None, version=None, user_id=None, comment=None,
+                            print_line_items=None, digital_line_items=None, barter_detail=None):
         """
         Send a revision (ie a proposed new version) of an order back to the buyer.
         Must always be in response to a sent order.
         order_id: order that is being revised ("public ID" eg O-KVG)
+        barter_detail: new barter detail, if different.
         user_id: seller username who is sending the revision
         print_line_items / digital_line_items (one only):
             array of InsertionOrderLineItemPrint or InsertionOrderLineItemDigital objects.
@@ -714,6 +716,10 @@ class PATSSeller(PATSAPIClient):
         data = {
             'comment': comment
         }
+        if barter_detail:
+            data.update({
+                "barterDetail": barter_detail
+            })
         digital_line_items_obj = []
         if digital_line_items:
             for line_item in digital_line_items:
