@@ -823,7 +823,7 @@ class PATSBuyer(PATSAPIClient):
         )
         return js
 
-    def send_order(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, media_type=None, currency_code=None, external_order_id=None, vendor_id=None, recipient_emails=None, buyer_dict=None, notify_emails=None, additional_info=None, order_comment=None, respond_by_date=None, terms_and_conditions_name=None, terms_and_conditions_content=None, digital_line_items=None, print_line_items=None, order_id=None, **kwargs):
+    def send_order(self, agency_id=None, agency_group_id=None, user_id=None, campaign_id=None, media_type=None, barter_detail=None, currency_code=None, external_order_id=None, vendor_id=None, recipient_emails=None, buyer_dict=None, notify_emails=None, additional_info=None, order_comment=None, respond_by_date=None, terms_and_conditions_name=None, terms_and_conditions_content=None, digital_line_items=None, print_line_items=None, order_id=None, **kwargs):
         """
         Create a print or digital order in PATS.
         agency_id: PATS ID of the buying agency (eg 35-IDSDKAD-7)
@@ -831,6 +831,7 @@ class PATSBuyer(PATSAPIClient):
         user_id: (optional?) PATS ID of the person sending the order (different
             from the person named as the buyer contact in the order)
         media_type: Either 'Print' or 'Online'
+        barter_detail: Free-form text for barter information
         campaign_id: campaign to which to attach this order
         digital_line_items: object inserted as "line_items" in the order
         print_line_items: object inserted as "line_items" in the order
@@ -853,6 +854,7 @@ class PATSBuyer(PATSAPIClient):
         data = {
             "externalId": external_order_id,
             "mediaType": media_type,
+            "barterDetail": barter_detail,
             "currencyCode": currency_code,
             "vendorId": vendor_id,
             "recipientEmails": recipient_emails,
