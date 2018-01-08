@@ -1137,7 +1137,7 @@ class PATSSeller(PATSAPIClient):
             json.dumps(data)
         )
 
-        match = re.search('https?://(.+)?/proposals/(.+?)$', proposal_uri.decode('utf-8'))
+        match = re.search('https?://(.+)?/proposals/(.+?)$', proposal_uri)
         new_proposal_id = None
         if match:
             new_proposal_id = match.group(2)
